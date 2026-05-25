@@ -30,7 +30,10 @@ scheduler_events = {
 	"cron": {
 		"*/1 * * * *": [
 			"armure_apim_sentinel.tasks.generate_simulated_logs"
-		]
+		],
+		"*/5 * * * *": [
+			"armure_apim_sentinel.notification.queue.retry_failed_notifications"
+		],
 	}
 }
 
@@ -45,6 +48,9 @@ permission_query_conditions = {
 	"Security Alert Rule": "armure_apim_sentinel.permissions.get_permission_query_conditions",
 	"Alert Instance": "armure_apim_sentinel.permissions.get_permission_query_conditions",
 	"AI Audit Assessment": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+	"Notification Channel": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+	"Notification Queue Item": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+	"Notification Log": "armure_apim_sentinel.permissions.get_permission_query_conditions",
 }
 
 has_permission = {
@@ -52,6 +58,9 @@ has_permission = {
 	"Security Alert Rule": "armure_apim_sentinel.permissions.has_permission",
 	"Alert Instance": "armure_apim_sentinel.permissions.has_permission",
 	"AI Audit Assessment": "armure_apim_sentinel.permissions.has_permission",
+	"Notification Channel": "armure_apim_sentinel.permissions.has_permission",
+	"Notification Queue Item": "armure_apim_sentinel.permissions.has_permission",
+	"Notification Log": "armure_apim_sentinel.permissions.has_permission",
 }
 
 after_migrate = ["armure_apim_sentinel.install.after_migrate"]

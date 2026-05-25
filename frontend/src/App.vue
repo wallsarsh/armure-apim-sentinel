@@ -1,5 +1,8 @@
 <template>
-  <div class="flex flex-col md:flex-row min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 font-sans">
+  <div v-if="isGuestView" class="min-h-screen bg-zinc-950 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 font-sans">
+    <router-view />
+  </div>
+  <div v-else class="flex flex-col md:flex-row min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-emerald-500/20 selection:text-emerald-300 font-sans">
     <AppSidebar
       :current-tab="currentTab"
       :active-alerts-count="telemetry.activeAlertsCount"
@@ -29,15 +32,12 @@
               >{{ opt.label }}</button>
             </div>
           </div>
-          <button
-            @click="toggleDark"
-            class="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-all flex items-center gap-1.5 shrink-0"
-            :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
-          >
-            <Sun v-if="isDark" class="h-4.5 w-4.5 text-amber-500 animate-pulse" />
-            <Moon v-else class="h-4.5 w-4.5 text-indigo-500" />
-            <span class="hidden sm:inline font-bold text-[11px] uppercase tracking-wider text-zinc-300">{{ isDark ? 'Light Mode' : 'Dark Mode' }}</span>
-          </button>
+          <div v-if="session.isLoggedIn" class="flex items-center gap-2">
+            <span class="text-zinc-400 text-[10px] font-mono truncate max-w-[120px]">{{ session.user.email }}</span>
+            <button @click="session.logout" class="p-1.5 hover:bg-rose-500/10 hover:text-rose-400 text-zinc-500 rounded border border-transparent hover:border-rose-500/20 transition-all cursor-pointer" title="Sign out">
+              <LogOut class="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
       <div class="p-5 md:p-8 space-y-6 flex-1 select-none">
@@ -56,13 +56,15 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useTelemetryStore } from "./stores/telemetry"
+import { useSessionStore } from "./stores/sessionStore"
 import AppSidebar from "./components/layout/AppSidebar.vue"
 import MetricsCards from "./components/shared/MetricsCards.vue"
-import { Sun, Moon } from "lucide-vue-next"
+import { Sun, Moon, LogOut } from "lucide-vue-next"
 
 const router = useRouter()
 const route = useRoute()
 const telemetry = useTelemetryStore()
+const session = useSessionStore()
 
 const isDark = ref(true)
 const periodHours = ref(24)
@@ -75,6 +77,8 @@ const periodLabel = computed(() => {
   const map = { 2: 'Last 2h', 24: 'Last 24h', 72: 'Last 3d' }
   return map[periodHours.value] || 'Last 24h'
 })
+
+const isGuestView = computed(() => route.meta?.guestOnly)
 
 let pollInterval = null
 
@@ -99,8 +103,10 @@ onMounted(async () => {
   isDark.value = stored !== "light"
   document.documentElement.classList.toggle("theme-light", !isDark.value)
 
-  await telemetry.initialLoad()
-  pollInterval = setInterval(() => telemetry.pollAll(periodHours.value), 2500)
+  if (!isGuestView.value) {
+    await telemetry.initialLoad()
+    pollInterval = setInterval(() => telemetry.pollAll(periodHours.value), 2500)
+  }
 })
 
 onUnmounted(() => {

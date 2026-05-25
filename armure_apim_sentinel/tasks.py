@@ -8,6 +8,7 @@ import frappe
 from armure_apim_sentinel.opensearch_client import get_client, ensure_index, index_log
 from armure_apim_sentinel.utils import evaluate_rules_for_log
 from armure_apim_sentinel.realtime import publish_alert
+from armure_apim_sentinel.notification import dispatch_notification
 
 
 API_PATHS = [
@@ -101,3 +102,4 @@ def generate_simulated_logs():
 			doc.update(alert_data)
 			doc.insert(ignore_permissions=True)
 			publish_alert(alert_data)
+			dispatch_notification(doc, alert_data.get("rule"))

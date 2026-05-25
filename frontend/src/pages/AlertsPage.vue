@@ -205,9 +205,170 @@
               </div>
             </div>
           </template>
+          <!-- Notification Channels -->
+          <div class="border-t border-zinc-800 pt-3">
+            <span class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Notify Channels</span>
+            <div v-if="availableChannels.length" class="flex flex-wrap gap-2 mt-2">
+              <label v-for="ch in availableChannels" :key="ch.channel_name" :class="['flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all', newRule.selectedChannels.includes(ch.channel_name) ? 'bg-emerald-950/30 text-emerald-400 border-emerald-700/40' : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700']">
+                <input type="checkbox" :value="ch.channel_name" v-model="newRule.selectedChannels" class="accent-emerald-500 sr-only" />
+                <Bell class="h-3 w-3" />
+                <span>{{ ch.channel_name }}</span>
+              </label>
+            </div>
+            <p v-else class="text-xs text-zinc-600 mt-1">No notification channels configured — visit Notifications tab to add them.</p>
+          </div>
           <div class="flex justify-end gap-2 text-xs pt-2">
             <button type="button" @click="showAddRule = false; showAdvancedFilters = false" class="px-3.5 py-2 hover:bg-zinc-800 text-zinc-400 border border-transparent rounded-lg cursor-pointer font-medium">Cancel</button>
             <button type="submit" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 rounded-lg cursor-pointer font-bold">Deploy Policy Rule</button>
+          </div>
+        </form>
+        <!-- Edit Rule Form -->
+        <form v-if="showEditRule" @submit.prevent="updateRule" class="bg-blue-950/10 border border-blue-500/20 rounded-xl p-5 space-y-4">
+          <h4 class="text-sm font-semibold text-blue-300 inline-flex items-center gap-2">
+            <Pencil class="h-4 w-4" />
+            <span>Edit Policy Rule: {{ editRuleRef?.rule_name || editRuleRef?.name }}</span>
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="space-y-1">
+              <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Policy Name</label>
+              <input type="text" placeholder="e.g. Rate Limiter Outage" v-model="editRule.name" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-medium" required />
+            </div>
+            <div class="space-y-1">
+              <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Condition Target Metric</label>
+              <select v-model="editRule.metric" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500">
+                <option value="latency">Response Latency (ms)</option>
+                <option value="status_code">HTTP Status Errors Threshold</option>
+                <option value="rate_limit">Rate Limit Remaining Limit</option>
+              </select>
+            </div>
+            <div class="space-y-1">
+              <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Trigger Criteria & Value</label>
+              <div class="flex gap-2">
+                <select v-model="editRule.condition" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 shrink-0">
+                  <option value="gt">Greater Than (&gt;)</option>
+                  <option value="lt">Less Than (&lt;)</option>
+                  <option value="eq">Equals (=)</option>
+                </select>
+                <input type="number" v-model.number="editRule.value" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" required />
+              </div>
+            </div>
+            <div class="space-y-1">
+              <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Alert Severity Tier</label>
+              <select v-model="editRule.severity" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-semibold">
+                <option value="info">Info (Blue)</option>
+                <option value="warning">Warning (Amber)</option>
+                <option value="critical">Critical (Rose)</option>
+              </select>
+            </div>
+          </div>
+          <div class="border-t border-zinc-800 pt-3">
+            <button type="button" @click="showEditAdvanced = !showEditAdvanced" class="flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer">
+              <span class="font-mono font-bold">{{ showEditAdvanced ? '▾' : '▸' }}</span>
+              <span class="font-semibold">Advanced API Selection</span>
+            </button>
+          </div>
+          <template v-if="showEditAdvanced">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">HTTP Method</label>
+                <select v-model="editRule.filter_method" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500">
+                  <option value="Any">Any</option>
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Path Pattern</label>
+                <input type="text" placeholder="e.g. /api/v1/users/* or re:^/api" v-model="editRule.filter_path_pattern" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Path Search</label>
+                <select v-model="editRule.filter_path_search_type" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500">
+                  <option value="glob">Glob</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Source Channel</label>
+                <input type="text" placeholder="Leave empty for all" v-model="editRule.filter_source" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">IP Range (CIDR)</label>
+                <input type="text" placeholder="10.0.0.0/8,192.168.1.0/24" v-model="editRule.filter_ip_range" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">User-Agent Pattern</label>
+                <input type="text" placeholder="*Mozilla* or re:bot" v-model="editRule.filter_user_agent_pattern" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">UA Search</label>
+                <select v-model="editRule.filter_user_agent_search_type" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500">
+                  <option value="glob">Glob</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Payload (bytes)</label>
+                <input type="number" v-model.number="editRule.filter_min_payload" min="0" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Max Payload (bytes)</label>
+                <input type="number" v-model.number="editRule.filter_max_payload" min="0" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Status Code</label>
+                <input type="number" v-model.number="editRule.filter_status_min" min="0" max="599" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Max Status Code</label>
+                <input type="number" v-model.number="editRule.filter_status_max" min="0" max="599" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+            </div>
+            <div class="border-t border-zinc-800 pt-3 mt-2">
+              <span class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Enhanced Evaluation</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs mt-2">
+              <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="ecb" v-model="editRule.count_based" class="accent-blue-500" />
+                <label for="ecb" class="text-zinc-400 text-xs font-medium cursor-pointer">Count-Based Evaluation</label>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Window (min)</label>
+                <input type="number" v-model.number="editRule.evaluation_window" min="1" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Trigger Count</label>
+                <input type="number" v-model.number="editRule.min_trigger_count" min="1" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Group By</label>
+                <select v-model="editRule.group_by" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-blue-500">
+                  <option value="none">None (Global)</option>
+                  <option value="source">Source Channel</option>
+                  <option value="ip">Client IP</option>
+                  <option value="path">API Path</option>
+                  <option value="method">HTTP Method</option>
+                </select>
+              </div>
+            </div>
+          </template>
+          <div class="border-t border-zinc-800 pt-3">
+            <span class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Notify Channels</span>
+            <div v-if="availableChannels.length" class="flex flex-wrap gap-2 mt-2">
+              <label v-for="ch in availableChannels" :key="ch.channel_name" :class="['flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all', editRule.selectedChannels.includes(ch.channel_name) ? 'bg-emerald-950/30 text-emerald-400 border-emerald-700/40' : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-700']">
+                <input type="checkbox" :value="ch.channel_name" v-model="editRule.selectedChannels" class="accent-emerald-500 sr-only" />
+                <Bell class="h-3 w-3" />
+                <span>{{ ch.channel_name }}</span>
+              </label>
+            </div>
+            <p v-else class="text-xs text-zinc-600 mt-1">No notification channels configured.</p>
+          </div>
+          <div class="flex justify-end gap-2 text-xs pt-2">
+            <button type="button" @click="cancelEditRule" class="px-3.5 py-2 hover:bg-zinc-800 text-zinc-400 border border-transparent rounded-lg cursor-pointer font-medium">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-lg cursor-pointer font-bold">Save Changes</button>
           </div>
         </form>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -232,6 +393,11 @@
                 <span v-if="ru.filter_min_payload > 0 || ru.filter_max_payload > 0" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">PAYLOAD: {{ ru.filter_min_payload || 0 }}-{{ ru.filter_max_payload || '∞' }}</span>
                 <span v-if="ru.filter_status_min > 0 || ru.filter_status_max > 0" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">STATUS: {{ ru.filter_status_min || 0 }}-{{ ru.filter_status_max || 599 }}</span>
               </div>
+              <div v-if="ru.notification_channels && ru.notification_channels.length" class="flex flex-wrap gap-1.5 mt-2">
+                <span v-for="ch in ru.notification_channels" :key="ch.name" :class="['text-[10px] px-1.5 py-0.5 rounded font-mono border inline-flex items-center gap-1', ch.enabled ? 'bg-emerald-950/30 text-emerald-400 border-emerald-700/40' : 'bg-zinc-800/50 text-zinc-500 border-zinc-700/40']">
+                  <Bell class="h-3 w-3" /> {{ ch.name }}
+                </span>
+              </div>
             </div>
             <div class="flex justify-between items-center text-xs mt-4 pt-3 border-t border-zinc-800/40">
               <div class="flex items-center gap-2">
@@ -240,9 +406,17 @@
                 </button>
                 <span class="text-zinc-500">{{ ru.is_active ? 'Active Policy' : 'Muted / Inactive' }}</span>
               </div>
-              <button @click="deleteRule(ru.name)" class="p-1.5 hover:bg-rose-500/10 hover:text-rose-400 text-zinc-500 rounded border border-transparent hover:border-rose-500/20 transition-all cursor-pointer" title="Remove Rule">
-                <Trash2 class="h-4 w-4" />
-              </button>
+              <div class="flex items-center gap-1">
+                <button @click="cloneRule(ru)" class="p-1.5 hover:bg-zinc-700 hover:text-zinc-200 text-zinc-500 rounded border border-transparent hover:border-zinc-700/40 transition-all cursor-pointer" title="Clone Rule">
+                  <Copy class="h-4 w-4" />
+                </button>
+                <button @click="startEditRule(ru)" class="p-1.5 hover:bg-blue-500/10 hover:text-blue-400 text-zinc-500 rounded border border-transparent hover:border-blue-500/20 transition-all cursor-pointer" title="Edit Rule">
+                  <Pencil class="h-4 w-4" />
+                </button>
+                <button @click="deleteRule(ru.name)" class="p-1.5 hover:bg-rose-500/10 hover:text-rose-400 text-zinc-500 rounded border border-transparent hover:border-rose-500/20 transition-all cursor-pointer" title="Remove Rule">
+                  <Trash2 class="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -346,7 +520,7 @@
 import { ref, computed, onMounted } from "vue"
 import { useTelemetryStore } from "../stores/telemetry"
 import api from "../api"
-import { Radio, Brain, ShieldAlert, Check, ShieldCheck, Clock, Sparkles, Plus, Trash2 } from "lucide-vue-next"
+import { Radio, Brain, ShieldAlert, Check, ShieldCheck, Clock, Sparkles, Plus, Trash2, Bell, Copy, Pencil } from "lucide-vue-next"
 
 const telemetry = useTelemetryStore()
 const activeTab = ref("triggered")
@@ -363,6 +537,20 @@ const tabs = [
 const activeAlerts = computed(() => telemetry.alerts.filter(a => !a.resolved))
 
 const showAdvancedFilters = ref(false)
+const showEditAdvanced = ref(false)
+const showEditRule = ref(false)
+const editRuleRef = ref(null)
+const availableChannels = ref([])
+
+const editRule = ref({ name: "", metric: "latency", condition: "gt", value: 500, severity: "warning",
+  filter_method: "Any", filter_path_pattern: "", filter_path_search_type: "glob",
+  filter_source: "", filter_ip_range: "",
+  filter_user_agent_pattern: "", filter_user_agent_search_type: "glob",
+  filter_min_payload: 0, filter_max_payload: 0,
+  filter_status_min: 0, filter_status_max: 0,
+  count_based: false, evaluation_window: 5, min_trigger_count: 1, group_by: "none",
+  selectedChannels: [],
+})
 
 const newRule = ref({ name: "", metric: "latency", condition: "gt", value: 500, severity: "warning",
   filter_method: "Any", filter_path_pattern: "", filter_path_search_type: "glob",
@@ -371,6 +559,7 @@ const newRule = ref({ name: "", metric: "latency", condition: "gt", value: 500, 
   filter_min_payload: 0, filter_max_payload: 0,
   filter_status_min: 0, filter_status_max: 0,
   count_based: false, evaluation_window: 5, min_trigger_count: 1, group_by: "none",
+  selectedChannels: [],
 })
 
 const safeScore = computed(() => {
@@ -442,6 +631,86 @@ async function resolveAllAlerts() {
   catch (e) { console.error(e) }
 }
 
+async function cloneRule(ru) {
+  try {
+    await api.post("armure_apim_sentinel.api.alerts.clone_rule", { name: ru.name, new_rule_name: ru.rule_name + " (Copy)" })
+    await telemetry.fetchRules()
+  } catch (e) { console.error(e) }
+}
+
+function startEditRule(ru) {
+  editRuleRef.value = ru
+  editRule.value = {
+    name: ru.rule_name || ru.name,
+    metric: ru.metric,
+    condition: ru.condition,
+    value: ru.threshold || ru.value,
+    severity: ru.severity,
+    filter_method: ru.filter_method || "Any",
+    filter_path_pattern: ru.filter_path_pattern || "",
+    filter_path_search_type: ru.filter_path_search_type || "glob",
+    filter_source: ru.filter_source || "",
+    filter_ip_range: ru.filter_ip_range || "",
+    filter_user_agent_pattern: ru.filter_user_agent_pattern || "",
+    filter_user_agent_search_type: ru.filter_user_agent_search_type || "glob",
+    filter_min_payload: ru.filter_min_payload || 0,
+    filter_max_payload: ru.filter_max_payload || 0,
+    filter_status_min: ru.filter_status_min || 0,
+    filter_status_max: ru.filter_status_max || 0,
+    count_based: !!ru.count_based,
+    evaluation_window: ru.evaluation_window || 5,
+    min_trigger_count: ru.min_trigger_count || 1,
+    group_by: ru.group_by || "none",
+    selectedChannels: (ru.notification_channels || []).map(c => c.name),
+  }
+  showEditRule.value = true
+  showEditAdvanced.value = showRuleFilters(ru)
+}
+
+function cancelEditRule() {
+  showEditRule.value = false
+  showEditAdvanced.value = false
+  editRuleRef.value = null
+}
+
+async function updateRule() {
+  try {
+    const payload = {
+      rule_name: editRuleRef.value.name,
+      name: editRule.value.name,
+      metric: editRule.value.metric,
+      condition: editRule.value.condition,
+      threshold: editRule.value.value,
+      severity: editRule.value.severity,
+      filter_method: editRule.value.filter_method === "Any" ? "" : editRule.value.filter_method,
+      filter_path_pattern: editRule.value.filter_path_pattern,
+      filter_path_search_type: editRule.value.filter_path_search_type,
+      filter_source: editRule.value.filter_source,
+      filter_ip_range: editRule.value.filter_ip_range,
+      filter_user_agent_pattern: editRule.value.filter_user_agent_pattern,
+      filter_user_agent_search_type: editRule.value.filter_user_agent_search_type,
+      filter_min_payload: editRule.value.filter_min_payload,
+      filter_max_payload: editRule.value.filter_max_payload,
+      filter_status_min: editRule.value.filter_status_min,
+      filter_status_max: editRule.value.filter_status_max,
+      count_based: editRule.value.count_based ? 1 : 0,
+      evaluation_window: editRule.value.evaluation_window,
+      min_trigger_count: editRule.value.min_trigger_count,
+      group_by: editRule.value.group_by,
+    }
+    await api.post("armure_apim_sentinel.api.alerts.update_rule", payload)
+    // Update notification channels
+    await api.post("armure_apim_sentinel.api.alerts.link_rule_channels", {
+      name: editRuleRef.value.name,
+      notification_channels: editRule.value.selectedChannels,
+    })
+    showEditRule.value = false
+    showEditAdvanced.value = false
+    editRuleRef.value = null
+    await telemetry.fetchRules()
+  } catch (e) { console.error(e) }
+}
+
 async function createRule() {
   try {
     const payload = {
@@ -465,6 +734,7 @@ async function createRule() {
       evaluation_window: newRule.value.evaluation_window,
       min_trigger_count: newRule.value.min_trigger_count,
       group_by: newRule.value.group_by,
+      notification_channels: newRule.value.selectedChannels,
     }
     await api.post("armure_apim_sentinel.api.alerts.create_rule", payload)
     showAddRule.value = false
@@ -476,8 +746,16 @@ async function createRule() {
       filter_min_payload: 0, filter_max_payload: 0,
       filter_status_min: 0, filter_status_max: 0,
       count_based: false, evaluation_window: 5, min_trigger_count: 1, group_by: "none",
+      selectedChannels: [],
     }
     await telemetry.fetchRules()
+  } catch (e) { console.error(e) }
+}
+
+async function fetchChannels() {
+  try {
+    const res = await api.get("armure_apim_sentinel.api.notifications.list_channels")
+    availableChannels.value = res.message || []
   } catch (e) { console.error(e) }
 }
 
@@ -499,6 +777,7 @@ onMounted(async () => {
   await telemetry.fetchAlerts()
   await telemetry.fetchRules()
   await telemetry.fetchScanHistory()
+  await fetchChannels()
   if (telemetry.scanHistory.length) currentReport.value = telemetry.scanHistory[0]
 })
 </script>

@@ -33,9 +33,11 @@
   "section_evaluation",
   "count_based",
   "evaluation_window",
-  "min_trigger_count",
-  "group_by"
- ],
+   "min_trigger_count",
+   "group_by",
+   "section_notifications",
+   "notifications"
+  ],
  "fields": [
   {
    "fieldname": "rule_name",
@@ -195,6 +197,17 @@
    "fieldtype": "Select",
    "label": "Group By",
    "options": "none\nsource\nip\npath\nmethod"
+  },
+  {
+   "fieldname": "section_notifications",
+   "fieldtype": "Section Break",
+   "label": "Notification Channels"
+  },
+  {
+   "fieldname": "notifications",
+   "fieldtype": "Table",
+   "label": "Notification Channels",
+   "options": "Security Alert Rule Notification"
   }
  ],
  "force_re_creation_of_tables": 0,

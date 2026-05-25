@@ -50,6 +50,13 @@
             <span>Log Channels</span>
           </div>
         </button>
+        <!-- Notifications -->
+        <button @click="$emit('update:currentTab', 'notifications')" :class="navBtnClass('notifications')">
+          <div class="flex items-center gap-2.5">
+            <Bell class="h-4.5 w-4.5 text-zinc-400" />
+            <span>Notifications</span>
+          </div>
+        </button>
       </nav>
     </div>
     <div class="pt-6 border-t border-zinc-800 mt-5 md:mt-0 text-[10px] text-zinc-500 space-y-1.5 font-mono">
@@ -65,7 +72,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue"
-import { Cpu, Activity, Terminal, Radio, Server } from "lucide-vue-next"
+import { Cpu, Activity, Terminal, Radio, Server, Bell } from "lucide-vue-next"
 
 const props = defineProps({
   currentTab: { type: String, default: "dashboard" },

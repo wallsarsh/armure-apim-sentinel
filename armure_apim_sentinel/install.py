@@ -1,3 +1,5 @@
+import json
+
 import frappe
 
 
@@ -9,6 +11,8 @@ def after_migrate():
 		seed_default_rules()
 	if frappe.db.exists("DocType", "API Security App Settings"):
 		seed_app_settings()
+	if frappe.db.exists("DocType", "Notification Channel"):
+		seed_default_channels()
 
 
 def seed_default_sources():
@@ -69,6 +73,38 @@ def seed_default_rules():
 		if not frappe.db.exists("Security Alert Rule", {"rule_name": rule["rule_name"]}):
 			doc = frappe.new_doc("Security Alert Rule")
 			doc.update(rule)
+			doc.insert()
+
+
+def seed_default_channels():
+	defaults = [
+		{
+			"channel_name": "Email Alert",
+			"channel_type": "email",
+			"is_active": 1,
+			"rate_limit_per_minute": 30,
+			"config_json": json.dumps({
+				"smtp_host": "",
+				"smtp_port": 587,
+				"smtp_user": "",
+				"smtp_password": "",
+				"from_email": "armure@localhost",
+				"to_emails": ["admin@example.com"],
+				"use_tls": True,
+			}),
+		},
+		{
+			"channel_name": "Slack Alert",
+			"channel_type": "slack",
+			"is_active": 1,
+			"rate_limit_per_minute": 60,
+			"config_json": json.dumps({"webhook_url": ""}),
+		},
+	]
+	for ch in defaults:
+		if not frappe.db.exists("Notification Channel", {"channel_name": ch["channel_name"]}):
+			doc = frappe.new_doc("Notification Channel")
+			doc.update(ch)
 			doc.insert()
 
 
