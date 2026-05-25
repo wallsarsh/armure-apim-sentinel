@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp ../armure_apim_sentinel/public/frontend/index.html ../armure_apim_sentinel/www/api_security_monitor.html",
+    "build": "vite build && yarn copy-html-entry",
+		"copy-html-entry": "cp ../armure_apim_sentinel/public/frontend/index.html ../armure_apim_sentinel/www/api_security_monitor.html",
     "preview": "vite preview"
   },
   "dependencies": {
