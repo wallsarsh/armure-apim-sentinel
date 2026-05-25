@@ -34,7 +34,7 @@
               >{{ opt.label }}</button>
             </div>
           </div>
-          <div v-if="session.isLoggedIn" class="flex items-center gap-2 border-l border-zinc-800 pl-3 ml-3">
+          <div v-if="session.initialized && session.isLoggedIn" class="flex items-center gap-2 border-l border-zinc-800 pl-3 ml-3">
             <span class="text-zinc-400 text-[10px] font-mono truncate max-w-[120px]">{{ session.user.email }}</span>
             <button @click="session.logout" class="p-1.5 hover:bg-rose-500/10 hover:text-rose-400 text-zinc-500 rounded border border-transparent hover:border-rose-500/20 transition-all cursor-pointer" title="Sign out">
               <LogOut class="h-4 w-4" />
@@ -104,6 +104,8 @@ onMounted(async () => {
   const stored = localStorage.getItem("theme")
   isDark.value = stored !== "light"
   document.documentElement.setAttribute("data-theme", isDark.value ? "dark" : "light")
+
+  await session.initialize()
 
   if (!isGuestView.value) {
     await telemetry.initialLoad()

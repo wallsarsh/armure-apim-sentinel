@@ -140,6 +140,10 @@ Every loading, empty, error, disabled, color-coded threshold, and animation stat
 | `opensearch_password` | Password | Stored encrypted |
 | `enable_live_simulation` | Check | Default `1` |
 | `simulation_interval_ms` | Int | Default `4000` |
+| `ai_provider` | Select | `Gemini\nOpenAI Compatible`, default `Gemini` |
+| `ai_api_base` | Data | OpenAI-compatible base URL, default `http://ollama:11434/v1` |
+| `ai_api_key` | Password | API key for the provider |
+| `ai_model` | Data | Model name, default `gemini-2.0-flash` |
 
 ### 2.6 OpenSearch Index Mapping
 
@@ -185,6 +189,15 @@ api_security_monitor/
     ├── opensearch_client.py       # get_client(), ensure_index(), index_log()
     ├── utils.py                   # Rule evaluation engine, Redis cache helpers
     ├── realtime.py                # publish_alert(), publish_scan_complete()
+    ├── ai/
+    │   ├── __init__.py
+    │   ├── base_provider.py       # Abstract AIProvider ABC
+    │   ├── provider_factory.py    # get_ai_provider() factory
+    │   ├── prompts.py             # Shared prompt templates
+    │   └── providers/
+    │       ├── __init__.py
+    │       ├── gemini.py          # Google Gemini provider
+    │       └── openai_compatible.py # OpenAI-compatible provider (Ollama)
     ├── api/
     │   ├── __init__.py
     │   ├── dashboard.py           # get_summary(), get_charts(), get_breakdown()
@@ -193,7 +206,7 @@ api_security_monitor/
     │   ├── rules.py               # list, create, update, delete
     │   ├── alerts.py              # list, resolve_all, resolve_one
     │   ├── simulation.py          # get_config(), update_config()
-    │   └── ai_gemini.py           # explain_error(), run_anomaly_scan(), get_scan_history()
+    │   └── ai.py                  # explain_error(), run_ai_audit() (thin layer over AIProvider)
     ├── fixtures/                  # Seed data JSON (default sources, rules)
     ├── tasks.py                   # generate_simulated_logs() (cron worker)
     └── doc_events.py              # Rule on_update → invalidate Redis cache
@@ -396,8 +409,8 @@ The `get_permission_query_conditions` function is registered in `hooks.py` for e
 | `POST /api/alerts/resolve` | `api.alerts.resolve_all()` | System Manager | |
 | `POST /api/alerts/:id/resolve` | `api.alerts.resolve_one()` | System Manager | |
 | `POST /api/simulation/config` | `api.simulation.update_config()` | System Manager | Updates App Settings Singleton |
-| `POST /api/explain-error` | `api.ai_gemini.explain_error(log_id)` | System Manager | Reads log from OpenSearch by id |
-| `POST /api/anomaly-scan` | `api.ai_gemini.run_anomaly_scan()` | System Manager | Fetches last 85 from OpenSearch; creates AI Audit Assessment + Alert Instance |
+| `POST /api/explain-error` | `api.ai.explain_error(log_id)` | System Manager | Reads log from OpenSearch by id; uses configured AI provider |
+| `POST /api/anomaly-scan` | `api.anomaly.trigger_anomaly_scan()` | System Manager | Fetches last 85 from OpenSearch; enqueues `ai.run_ai_audit()`; uses configured AI provider |
 | `GET /api/anomaly-scan/history` | Frappe standard API on AI Audit Assessment | System Manager | |
 
 ---
@@ -1062,7 +1075,7 @@ Frontend dependencies go in `frontend/package.json`.
 9. `api/rules.py` — CRUD + toggle
 10. `api/alerts.py` — list + resolve
 11. `api/simulation.py` — config management
-12. `api/ai_gemini.py` — `explain_error()`, `run_anomaly_scan()`
+12. `api/ai.py` — `explain_error()`, `run_ai_audit()` (uses AIProvider abstraction)
 13. `tasks.py` — `generate_simulated_logs()`
 14. `create fixtures/ directory` — seed data JSON (default sources, rules)
 15. `install.py` — `after_migrate` seed function
@@ -1681,3 +1694,283 @@ For Discord/Slack, the template renders into the message content field. For Emai
 - [ ] Existing alerts flow unchanged when no channels configured
 - [ ] Rule-card shows linked channels count/badges
 - [ ] Many-to-many mapping: one rule → multiple channels, one channel → multiple rules
+
+---
+
+## 13. AI Provider Abstraction
+
+### 13.1 Motivation
+
+Currently, `api/ai.py` imports `google.genai` directly and uses a hardcoded `gemini-2.0-flash` model. This tightly couples all AI features (anomaly scanning and error explanation) to Google Gemini. The goal is to abstract the AI backend behind an interface so that different providers can be swapped in — specifically **Ollama** (serving local models via an OpenAI-compatible API).
+
+The abstraction follows the same adapter pattern already established by the notification engine (`notification/adapter_base.py` → concrete adapters).
+
+### 13.2 Architecture
+
+```
+api/anomaly.py → enqueue → api/ai.py
+                                ↓
+                     ai/provider_factory.py
+                      get_ai_provider(s)
+                                ↓
+              ┌──────────────────┴──────────────────┐
+              ↓                                      ↓
+    ai/providers/gemini.py                ai/providers/openai_compatible.py
+    (google.genai SDK)                         (openai SDK, OpenAI-compatible)
+                                                    ↓
+                                              Ollama / vLLM / etc.
+```
+
+### 13.3 Abstract Interface — `ai/base_provider.py`
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+@dataclass
+class AuditResult:
+    anomaly_score: int       # 0–100
+    report: str               # Markdown report
+    alerts_count: int         # Detected suspicious events
+
+class AIProvider(ABC):
+    @abstractmethod
+    def audit_logs(self, logs: list[dict]) -> AuditResult:
+        """Batch anomaly scan. Returns score, report, alert count."""
+        pass
+
+    @abstractmethod
+    def explain_error(self, log: dict) -> str:
+        """Per-log explanation. Returns markdown string."""
+        pass
+```
+
+### 13.4 Provider Implementations
+
+#### 13.4.1 `ai/providers/gemini.py` — GeminiProvider
+
+- Wraps existing `google.genai` client
+- Constructor: `GeminiProvider(api_key: str, model: str = "gemini-2.0-flash")`
+- `audit_logs()` → formats `AUDIT_PROMPT`, calls `client.models.generate_content()`, parses score with regex
+- `explain_error()` → formats `EXPLAIN_ERROR_PROMPT`, calls same client
+- Falls back to existing behavior when Gemini API key is missing (creates error DocType)
+
+#### 13.4.2 `ai/providers/openai_compatible.py` — OpenAICompatibleProvider
+
+- Uses the `openai` Python SDK with a configurable base URL
+- Constructor: `OpenAICompatibleProvider(api_base: str, api_key: str, model: str)`
+- Internally creates `openai.OpenAI(base_url=api_base, api_key=api_key)`
+- `audit_logs()` → calls `client.chat.completions.create(model=model, messages=[...])`, parses score
+- `explain_error()` → same pattern, returns `response.choices[0].message.content`
+- Shares the same prompt templates (from `ai/prompts.py`) as Gemini
+
+### 13.5 Shared Prompts — `ai/prompts.py`
+
+Extract the two hardcoded prompts from the prototype (`server.ts` lines 894-905 and 943-960):
+
+```python
+AUDIT_PROMPT = """You are an AI Security and Systems SRE Bot.
+We will give you the latest {log_count} API log summaries in JSON format.
+Your task is to:
+1. Scan for anomalies: Is there an unusual spike of status codes (e.g., 429, 401, 500)?
+   Are clients from a single IP sending brute-force payloads? Is there a latency regression?
+2. Quantify an Overall Anomaly Score on a scale from 0 to 100.
+3. If structural failures are identified, suggest automated alert rule sets.
+4. Output your analysis in a structured, professional markdown report.
+
+API logs to analyze:
+```json
+{logs_json}
+```
+
+First, return your response in the structure:
+ANOMALY_SCORE: <number between 0 and 100>
+REPORT:
+<Your markdown content>
+```
+
+EXPLAIN_ERROR_PROMPT = """You are a Principal Backend Engineer & API Architect.
+Analyze the following raw API Log trace that encountered an issue, status code, or warning.
+Explain:
+1. What the standard status code {status} means for this API.
+2. The most probable root cause of this specific failure given the latency of {latency}ms,
+   route "{method} {path}", source "{source}", and client IP "{ip}".
+3. Three highly practical, clean, and actionable troubleshooting steps or architectural corrections.
+
+Raw Log Context:
+```json
+{log_json}
+```
+
+Write the response in structured, beautifully formatted markdown.
+"""
+```
+
+Both providers use these exact templates — the only difference is the transport layer.
+
+### 13.6 Provider Factory — `ai/provider_factory.py`
+
+```python
+def get_ai_provider() -> AIProvider:
+    settings = frappe.get_single("API Security App Settings")
+    provider_type = settings.ai_provider or "Gemini"
+
+    if provider_type == "OpenAI Compatible":
+        return OpenAICompatibleProvider(
+            api_base=settings.ai_api_base or "http://ollama:11434/v1",
+            api_key=settings.get_password("ai_api_key") or "",
+            model=settings.ai_model or "llama3.2",
+        )
+
+    # Default: Gemini (backward compatible)
+    return GeminiProvider(
+        api_key=frappe.conf.get("gemini_api_key") or "",
+        model=settings.ai_model or "gemini-2.0-flash",
+    )
+```
+
+### 13.7 Refactored `api/ai.py`
+
+The file becomes a thin orchestration layer:
+
+```python
+@frappe.whitelist(allow_guest=True, methods="POST")
+def run_ai_audit(logs_json):
+    """Called via frappe.enqueue from trigger_anomaly_scan()."""
+    try:
+        logs = frappe.parse_json(logs_json)
+    except Exception:
+        logs = []
+
+    provider = get_ai_provider()
+    try:
+        result = provider.audit_logs(logs)
+    except Exception as e:
+        # Fallback: create error DocType (same as current Gemini-unconfigured path)
+        report = frappe.new_doc("AI Audit Assessment")
+        report.anomaly_score = 0
+        report.triggered_alerts_count = 0
+        report.generated_summary = f"<p>AI audit failed: {str(e)}</p>"
+        report.insert(ignore_permissions=True)
+        publish_scan_complete({"name": report.name, "score": 0, "summary": report.generated_summary})
+        return
+
+    # Create AI Audit Assessment DocType
+    report = frappe.new_doc("AI Audit Assessment")
+    report.anomaly_score = result.anomaly_score
+    report.triggered_alerts_count = result.alerts_count
+    report.generated_summary = result.report
+    report.insert(ignore_permissions=True)
+
+    # Create alert if score exceeds threshold
+    if result.anomaly_score > 40:
+        alert = frappe.new_doc("Alert Instance")
+        alert.alert_message = f"AI anomaly scan detected suspicious activity (score: {result.anomaly_score}/100)"
+        alert.severity = "critical" if result.anomaly_score > 70 else "warning"
+        alert.alert_type = "AI"
+        alert.details = json.dumps({"report": report.name, "score": result.anomaly_score})
+        alert.insert(ignore_permissions=True)
+        publish_alert({...})
+
+    publish_scan_complete({"name": report.name, "score": result.anomaly_score, "summary": result.report})
+
+
+@frappe.whitelist(allow_guest=True, methods="POST")
+def explain_error(logId):
+    """Per-log AI explanation. Called directly from the frontend."""
+    from armure_apim_sentinel.opensearch_client import get_client
+
+    client = get_client()
+    # Fetch single log from OpenSearch by ID
+    try:
+        response = client.search(index="api-telemetry-logs-*", body={
+            "query": {"term": {"_id": logId}},
+            "size": 1,
+        })
+        hits = response.get("hits", {}).get("hits", [])
+        if not hits:
+            return {"explanation": "Log not found in OpenSearch."}
+        log = hits[0]["_source"]
+    except Exception as e:
+        return {"explanation": f"Failed to fetch log: {str(e)}"}
+
+    provider = get_ai_provider()
+    try:
+        explanation = provider.explain_error(log)
+    except Exception as e:
+        explanation = f"Failed to get AI explanation: {str(e)}"
+
+    return {"explanation": explanation}
+```
+
+### 13.8 DocType Changes — API Security App Settings
+
+Add four fields to the existing Singleton DocType (already reflected in section 2.5 above):
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `ai_provider` | Select | `Gemini` | `Gemini\nOpenAI Compatible` |
+| `ai_api_base` | Data | `http://ollama:11434/v1` | OpenAI-compatible base URL |
+| `ai_api_key` | Password | (empty) | API key for the provider |
+| `ai_model` | Data | `gemini-2.0-flash` | Model name string |
+
+The field_order must be updated:
+```json
+"field_order": [
+    ...existing fields...,
+    "ai_settings_section",
+    "ai_provider",
+    "ai_api_base",
+    "ai_api_key",
+    "ai_model"
+]
+```
+
+### 13.9 Dependencies
+
+Add to `pyproject.toml` `[project] dependencies`:
+
+```toml
+"openai",  # For OpenAI-compatible provider (Ollama)
+```
+
+The `google-generativeai` package stays as an inline import (it's not a hard dependency — Gemini users install it themselves).
+
+### 13.10 Implementation Order
+
+| # | Step | Description | Files |
+|---|---|---|---|
+| 13.10.1 | Create `ai/__init__.py` | Package init | `ai/__init__.py` |
+| 13.10.2 | Create abstract base | `AIProvider` ABC + `AuditResult` dataclass | `ai/base_provider.py` |
+| 13.10.3 | Extract prompt templates | Port from prototype `server.ts` | `ai/prompts.py` |
+| 13.10.4 | Implement Gemini provider | Move existing `google.genai` logic | `ai/providers/__init__.py`, `ai/providers/gemini.py` |
+| 13.10.5 | Implement OpenAI provider | New `openai` SDK-based provider | `ai/providers/openai_compatible.py` |
+| 13.10.6 | Create provider factory | `get_ai_provider()` reads App Settings | `ai/provider_factory.py` |
+| 13.10.7 | Refactor `api/ai.py` | Use provider interface; add `explain_error()` | `api/ai.py` |
+| 13.10.8 | Update App Settings DocType JSON | Add 4 AI config fields + section break | `doctype/api_security_app_settings/*` |
+| 13.10.9 | Update App Settings Python class | New field properties | `doctype/api_security_app_settings/*.py` |
+| 13.10.10 | Add `openai` to dependencies | `pyproject.toml` | `pyproject.toml` |
+| 13.10.11 | Run bench migrate | Apply new DocType fields | — |
+| 13.10.12 | Run bench build | Compile frontend | — |
+| 13.10.13 | Integration test | All 3 provider scenarios | — |
+
+### 13.11 Migration Path
+
+- **Existing deployments** with `frappe.conf.gemini_api_key` continue working unmodified — the factory defaults to `GeminiProvider` when `ai_provider` is not set
+- **To switch to Ollama**: set `AI Provider → "OpenAI Compatible"` in App Settings, point `AI API Base` to Ollama's endpoint, set model name
+- **No data migration** needed — the `AI Audit Assessment` DocType schema is unchanged
+- The `google-generativeai` Python package is imported inline (in gemini.py) and is not a hard dependency of the app — users installing it only if they use Gemini
+
+### 13.12 Verification Checklist
+
+- [ ] `GeminiProvider` sends logs to Gemini and returns correct `AuditResult`
+- [ ] `OpenAICompatibleProvider` sends logs to Ollama endpoint and returns correct `AuditResult`
+- [ ] `explain_error()` logs from OpenSearch and returns markdown explanation via either provider
+- [ ] Provider factory falls back to Gemini when `ai_provider` not set (backward compatible)
+- [ ] Provider factory reads `AI API Base`, `AI API Key`, `AI Model` from App Settings
+- [ ] Missing Gemini API key creates error DocType with helpful message (existing behavior preserved)
+- [ ] `/api/method/armure_apim_sentinel.api.ai.explain_error` returns `{"explanation": "..."}`
+- [ ] Anomaly scan flow (trigger → enqueue → audit → DocType → realtime) works with both providers
+- [ ] App Settings UI shows the 4 new AI config fields
+- [ ] `openai` package listed in `pyproject.toml` dependencies
+- [ ] Frontend unchanged — all AI calls go through the same Frappe whitelisted methods

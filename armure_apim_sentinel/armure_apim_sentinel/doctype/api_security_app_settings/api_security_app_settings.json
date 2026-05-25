@@ -7,15 +7,20 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": [
-  "opensearch_host",
-  "opensearch_port",
-  "opensearch_user",
-  "opensearch_password",
-  "column_break_iooj",
-  "enable_live_simulation",
-  "simulation_interval_ms"
- ],
+  "field_order": [
+   "opensearch_host",
+   "opensearch_port",
+   "opensearch_user",
+   "opensearch_password",
+   "column_break_iooj",
+   "enable_live_simulation",
+   "simulation_interval_ms",
+   "ai_settings_section",
+   "ai_provider",
+   "ai_api_base",
+   "ai_api_key",
+   "ai_model"
+  ],
  "fields": [
   {
    "fieldname": "opensearch_host",
@@ -59,6 +64,35 @@
    "fieldtype": "Int",
    "label": "Simulation Interval (ms)",
    "default": 4000
+  },
+  {
+   "fieldname": "ai_settings_section",
+   "fieldtype": "Section Break",
+   "label": "AI Configuration"
+  },
+  {
+   "fieldname": "ai_provider",
+   "fieldtype": "Select",
+   "label": "AI Provider",
+   "default": "Gemini",
+   "options": "Gemini\nOpenAI Compatible"
+  },
+  {
+   "fieldname": "ai_api_base",
+   "fieldtype": "Data",
+   "label": "AI API Base URL",
+   "default": "http://ollama:11434/v1"
+  },
+  {
+   "fieldname": "ai_api_key",
+   "fieldtype": "Password",
+   "label": "AI API Key"
+  },
+  {
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "AI Model Name",
+   "default": "gemini-2.0-flash"
   }
  ],
  "force_re_creation_of_tables": 0,
