@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2025-05-25 00:00:00",
+ "default_view": null,
+ "description": "Global settings for the API Security Monitor app",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "opensearch_host",
+  "opensearch_port",
+  "opensearch_user",
+  "opensearch_password",
+  "column_break_iooj",
+  "enable_live_simulation",
+  "simulation_interval_ms"
+ ],
+ "fields": [
+  {
+   "fieldname": "opensearch_host",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "OpenSearch Host",
+   "reqd": 1,
+   "default": "localhost"
+  },
+  {
+   "fieldname": "opensearch_port",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "OpenSearch Port",
+   "reqd": 1,
+   "default": 9200
+  },
+  {
+   "fieldname": "opensearch_user",
+   "fieldtype": "Data",
+   "label": "OpenSearch User",
+   "default": "admin"
+  },
+  {
+   "fieldname": "opensearch_password",
+   "fieldtype": "Password",
+   "label": "OpenSearch Password"
+  },
+  {
+   "fieldname": "column_break_iooj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "enable_live_simulation",
+   "fieldtype": "Check",
+   "label": "Enable Live Simulation",
+   "default": 1
+  },
+  {
+   "fieldname": "simulation_interval_ms",
+   "fieldtype": "Int",
+   "label": "Simulation Interval (ms)",
+   "default": 4000
+  }
+ ],
+ "force_re_creation_of_tables": 0,
+ "hide_toolbar": 1,
+ "icon": null,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2025-05-25 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Armure APIM Sentinel",
+ "name": "API Security App Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "singular": "API Security App Settings",
+ "states": [],
+ "track_changes": 1,
+ "issingle": 1
+}

@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:channel_name",
+ "creation": "2025-05-25 00:00:00",
+ "default_view": null,
+ "description": "API source or channel that ingests logs",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "channel_name",
+  "protocol_type",
+  "secret_token",
+  "column_break_tlvt",
+  "status",
+  "total_logs_received"
+ ],
+ "fields": [
+  {
+   "fieldname": "channel_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Channel Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "protocol_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Protocol Type",
+   "options": "Gateway\nWebhook\nAgent\nCustom",
+   "reqd": 1
+  },
+  {
+   "fieldname": "secret_token",
+   "fieldtype": "Password",
+   "label": "Secret Token",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_tlvt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nInactive",
+   "default": "Active"
+  },
+  {
+   "fieldname": "total_logs_received",
+   "fieldtype": "Int",
+   "label": "Total Logs Received",
+   "read_only": 1,
+   "default": 0
+  }
+ ],
+ "force_re_creation_of_tables": 0,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-05-25 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Armure APIM Sentinel",
+ "name": "Log Ingest Adapter",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "All",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}
