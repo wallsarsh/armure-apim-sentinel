@@ -59,8 +59,17 @@
         </button>
       </nav>
     </div>
-    <div class="pt-6 border-t border-zinc-800 mt-5 md:mt-0 text-[10px] text-zinc-500 space-y-1.5 font-mono">
-      <div class="flex justify-between">
+    <div class="pt-6 border-t border-zinc-800 mt-5 md:mt-0 text-[10px] text-zinc-500 space-y-2.5 font-mono">
+      <button
+        @click="$emit('toggleDark')"
+        class="w-full px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer transition-all"
+        :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+      >
+        <Sun v-if="isDark" class="h-4 w-4 text-amber-400" />
+        <Moon v-else class="h-4 w-4 text-indigo-400" />
+        <span>{{ isDark ? 'Light Mode' : 'Dark Mode' }}</span>
+      </button>
+      <div class="flex justify-between mt-2">
         <span>SRE TIMING:</span>
         <span class="text-zinc-300 select-text">UTC</span>
       </div>
@@ -72,14 +81,15 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue"
-import { Cpu, Activity, Terminal, Radio, Server, Bell } from "lucide-vue-next"
+import { Cpu, Activity, Terminal, Radio, Server, Bell, Sun, Moon } from "lucide-vue-next"
 
 const props = defineProps({
   currentTab: { type: String, default: "dashboard" },
   activeAlertsCount: { type: Number, default: 0 },
+  isDark: { type: Boolean, default: true },
 })
 
-defineEmits(["update:currentTab"])
+defineEmits(["update:currentTab", "toggleDark"])
 
 const currentTime = ref("")
 let clockInterval = null
