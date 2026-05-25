@@ -6,7 +6,7 @@
         <div>
           <p class="text-zinc-500 text-xs uppercase font-bold tracking-wider">Total Traffic</p>
           <h3 class="text-3xl font-semibold text-zinc-100 mt-2 font-mono tracking-tight">
-            {{ loading ? "..." : formatNum(m?.totalRequests || 0) }}
+            {{ loading ? "..." : formatNum(metrics?.totalRequests || 0) }}
           </h3>
           <p class="text-emerald-500 text-xs mt-2 flex items-center gap-1">
             <span>● Live Ingesting</span>
@@ -24,10 +24,10 @@
         <div>
           <p class="text-zinc-500 text-xs uppercase font-bold tracking-wider">Average Latency</p>
           <h3 class="text-3xl font-semibold text-zinc-100 mt-2 font-mono tracking-tight">
-            {{ loading ? "..." : `${m?.avgLatency || 0} ms` }}
+            {{ loading ? "..." : `${metrics?.avgLatency || 0} ms` }}
           </h3>
           <p class="text-emerald-500 text-xs mt-2">
-            {{ (m?.avgLatency || 0) < 150 ? "✓ Excellent response times" : "⚠ Latency warning" }}
+            {{ (metrics?.avgLatency || 0) < 150 ? "✓ Excellent response times" : "⚠ Latency warning" }}
           </p>
         </div>
         <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-lg">
@@ -41,11 +41,11 @@
         <div>
           <p class="text-zinc-500 text-xs uppercase font-bold tracking-wider">Success Rate</p>
           <h3 class="text-3xl font-semibold text-zinc-100 mt-2 font-mono tracking-tight">
-            {{ loading ? "..." : `${m?.successRate || 100}%` }}
+            {{ loading ? "..." : `${metrics?.successRate || 100}%` }}
           </h3>
           <p class="text-xs mt-2">
-            <span :class="(m?.successRate || 100) >= 98 ? 'text-emerald-500' : 'text-amber-500'">
-              {{ m?.errorCount || 0 }} total errors
+            <span :class="(metrics?.successRate || 100) >= 98 ? 'text-emerald-500' : 'text-amber-500'">
+              {{ metrics?.errorCount || 0 }} total errors
             </span>
           </p>
         </div>
@@ -60,13 +60,13 @@
         <div>
           <p class="text-zinc-500 text-xs uppercase font-bold tracking-wider">Breaches / Alerts</p>
           <h3 class="text-3xl font-semibold text-zinc-100 mt-2 font-mono tracking-tight">
-            {{ loading ? "..." : (m?.activeAlerts || 0) }}
+            {{ loading ? "..." : (metrics?.activeAlerts || 0) }}
           </h3>
           <p class="text-rose-400 text-xs mt-2 flex items-center gap-1">
-            <span>{{ (m?.activeAlerts || 0) > 0 ? "⚠ Rule violations active" : "✓ Safe configuration" }}</span>
+            <span>{{ (metrics?.activeAlerts || 0) > 0 ? "⚠ Rule violations active" : "✓ Safe configuration" }}</span>
           </p>
         </div>
-        <div :class="(m?.activeAlerts || 0) > 0 ? 'p-3 bg-rose-500/20 text-rose-400 animate-pulse border border-rose-500/30 rounded-lg' : 'p-3 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg'">
+        <div :class="(metrics?.activeAlerts || 0) > 0 ? 'p-3 bg-rose-500/20 text-rose-400 animate-pulse border border-rose-500/30 rounded-lg' : 'p-3 bg-zinc-800 text-zinc-400 border border-zinc-700 rounded-lg'">
           <span class="lucide-alert-triangle size-5" />
         </div>
       </div>

@@ -20,9 +20,9 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     alerts.value.filter(a => !a.resolved).length
   )
 
-  async function pollAll() {
+  async function pollAll(period = 24) {
     await Promise.allSettled([
-      fetchDashboard(),
+      fetchDashboard(period),
       fetchAlerts(),
     ])
   }

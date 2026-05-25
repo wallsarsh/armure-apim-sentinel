@@ -100,7 +100,7 @@ onMounted(async () => {
   document.documentElement.classList.toggle("theme-light", !isDark.value)
 
   await telemetry.initialLoad()
-  pollInterval = setInterval(() => telemetry.pollAll(), 2500)
+  pollInterval = setInterval(() => telemetry.pollAll(periodHours.value), 2500)
 })
 
 onUnmounted(() => {
