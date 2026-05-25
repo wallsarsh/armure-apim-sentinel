@@ -967,43 +967,78 @@ def generate_simulated_logs():
 
 ## 8. Deployment Configuration
 
-### 8.1 Site Config
+### 8.1 Docker Environment
 
-```json
-// sites/site1/common_site_config.json
-{
-  "opensearch_host": "localhost",
-  "opensearch_port": 9200,
-  "opensearch_user": "admin",
-  "opensearch_password": "..."
-}
+The development environment uses `docker.io/frappe/bench:latest` (Frappe v16) with the following services:
+
+| Service | Image | Notes |
+|---|---|---|
+| frappe | `frappe/bench:latest` | Bench CLI + Python 3.14 pre-installed |
+| mariadb | `mariadb:11.8` | Database server |
+| redis-cache | `redis:alpine` | Cache |
+| redis-queue | `redis:alpine` | Queue + Socket.io broker |
+| opensearch | `opensearchproject/opensearch:3` | Log storage + analytics |
+
+**OpenSeach 3.x requires:**
+- `DISABLE_SECURITY_PLUGIN=true` for dev (HTTP, no TLS)
+- `OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin` (required since v2.12)
+- `discovery.type=single-node` for single-node dev cluster
+
+Access the Frappe site via the `Host` header since the site is named `apim.localhost`:
+```bash
+curl -s -H "Host: apim.localhost" http://localhost:8000/login
 ```
 
 ### 8.2 Dependencies
 
-Add to `api_security_monitor/requirements.txt`:
+Frappe v16 apps use `pyproject.toml` (not `requirements.txt`). Add Python packages to `[project] dependencies`:
+
+```toml
+# pyproject.toml
+[project]
+dependencies = [
+    "opensearch-py",
+]
 ```
-opensearch-py
-```
+
+Frontend dependencies go in `frontend/package.json`.
 
 ### 8.3 Services Required
 
-- MariaDB/PostgreSQL (Frappe's standard database)
-- Redis (Frappe's cache + queue broker)
-- OpenSearch (log storage + aggregation)
-- RQ Worker (bench worker — for background ingestion tasks)
-- Frappe Node.js Socket.io server (built-in, port 8000)
+- MariaDB (Frappe's standard database, containerized)
+- Redis × 2 (cache + queue broker, containerized)
+- OpenSearch 3.x (log storage + aggregation, containerized)
+- Frappe Node.js Socket.io server (built-in, port 9000 inside container)
 
 ---
 
 ## 9. Implementation Order
 
+### Phase 0: Docker Environment Setup
+
+1. Create `.env` file with MariaDB/Redis/OpenSearch connection settings
+2. Add OpenSearch 3.x service to `docker-compose.yml` (with `DISABLE_SECURITY_PLUGIN=true`, `OPENSEARCH_INITIAL_ADMIN_PASSWORD`)
+3. `docker compose up -d`
+4. Verify all 5 containers healthy: `docker compose ps`
+5. Inside the frappe container, the bench is pre-configured at `/workspace/development/armure-apim/`
+6. `bench build` to compile existing assets
+7. `bench new-app armure_apim_sentinel` (interactive — pipe defaults via `echo -e`)
+8. `bench --site apim.localhost install-app armure_apim_sentinel`
+9. Start dev server: `bench serve --port 8000`
+10. Add `opensearch-py` to `pyproject.toml` `[project] dependencies`
+
+> **Note:** Bench 5.x (shipped with `frappe/bench:latest`) does NOT support `--title`/`--description` flags. Use `echo -e` to pipe responses:
+> ```bash
+> echo -e 'Armure APIM Sentinel\nDescription...\nArmure Suite\ndevelopment@armure.in\nmit\nn' | bench new-app armure_apim_sentinel
+> ```
+> Bench 6+ supports silent mode flags: `bench new-app app_name --title "..." --description "..." --publisher "..." --email "..." --license "mit"`
+
 ### Phase 1: Frappe App Scaffolding
 
-1. `bench new-app api_security_monitor`
-2. Add `opensearch-py` to `requirements.txt`
-3. Register app in site
-4. `bench build && bench migrate`
+1. Create directory structure (`api/`, `fixtures/`, `public/js/`)
+2. Write `hooks.py` with all configuration entries
+3. Write `__init__.py`, `install.py`, `uninstall.py`, `doc_events.py`
+4. Run `bench migrate` to validate hooks
 
 ### Phase 2: DocType Definitions
 
@@ -1199,3 +1234,450 @@ opensearch-py
 - [ ] All rules disabled — no alerts generated
 - [ ] 2000+ logs in OpenSearch — query limit/pagination works
 - [ ] Concurrent dashboard requests — Redis caching prevents OpenSearch overload
+
+---
+
+## 11. Enhancements — Richer Rule Criteria
+
+### 11.1 Motivation
+
+The current `Security Alert Rule` DocType supports only a single numeric threshold check (`latency > 800`, `status_code > 499`, `rate_limit < 5`) evaluated against **every** ingested log. Users cannot restrict rules by HTTP method, path pattern, IP range, user-agent, payload size, or status code range. There is also no windowed / count-based evaluation (e.g., "trigger if more than 10 POST errors happen in 5 minutes").
+
+### 11.2 New Security Alert Rule Fields
+
+#### API Selection / Filtering (decide *which* logs to evaluate)
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `filter_method` | Select | `Any` | Restrict to one HTTP method: `Any`, `GET`, `POST`, `PUT`, `DELETE`, `PATCH` |
+| `filter_path_pattern` | Data | `""` | Glob or regex pattern. Empty = any path. Glob uses `fnmatch` (`/api/v1/billing/*`). If starts with `re:` prefix, treated as regex (`re:^/api/v1/users/\d+$`). |
+| `filter_path_search_type` | Select | `glob` | `glob` or `regex` — determines how `filter_path_pattern` is matched |
+| `filter_source` | Link → Log Ingest Adapter | `""` | Restrict to one source channel. Empty = any source |
+| `filter_ip_range` | Data | `""` | Comma-separated list of CIDR notations or single IPs (`10.0.0.0/8,192.168.1.50`) |
+| `filter_user_agent_pattern` | Data | `""` | Glob or regex on User-Agent. Empty = any UA. Same `re:` prefix convention |
+| `filter_user_agent_search_type` | Select | `glob` | `glob` or `regex` |
+| `filter_min_payload` | Int | `0` | Minimum payload size in bytes. `0` = no minimum |
+| `filter_max_payload` | Int | `0` | Maximum payload size in bytes. `0` = no maximum |
+| `filter_status_min` | Int | `0` | Min HTTP status to consider (e.g., `400` for client errors+). `0` = no minimum |
+| `filter_status_max` | Int | `0` | Max HTTP status. `0` = no maximum |
+
+#### Enhanced Evaluation (decide *how* to trigger)
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `count_based` | Check | `0` (off) | If enabled, use a rolling count over `evaluation_window` instead of per-log check |
+| `evaluation_window` | Int (minutes) | `5` | Sliding window size for count-based rules |
+| `min_trigger_count` | Int | `1` | Minimum number of matching logs in the window to trigger an alert |
+| `group_by` | Select | `none` | Aggregation dimension for count rules: `none`, `source`, `ip`, `path`, `method` |
+
+### 11.3 Updated Rule Engine
+
+The `evaluate_rules_for_log()` function gains a filter pipeline before the existing metric check:
+
+```
+for each rule:
+  1. FILTER PIPELINE (all filters are AND-ed)
+     - filter_method: skip if log.method doesn't match (when not "Any")
+     - filter_path_pattern: fnmatch or re.match against log.path
+     - filter_source: skip if log.source != filter_source
+     - filter_ip_range: ipaddress.ip_address(log.ip) in any CIDR
+     - filter_user_agent_pattern: fnmatch or re.match against log.userAgent
+     - filter_min_payload: skip if log.payloadSize < filter_min_payload
+     - filter_max_payload: skip if log.payloadSize > filter_max_payload
+     - filter_status_min: skip if log.status < filter_status_min
+     - filter_status_max: skip if log.status > filter_status_max
+
+  2. If any filter fails → skip to next rule
+
+  3. EVALUATION
+     a) If count_based is OFF:
+        - Apply metric+condition+threshold check (existing logic)
+     b) If count_based is ON:
+        - Build Redis key: "rule_count:{rule_name}:{group_by_value}"
+        - INCR the key, set EXPIRE to evaluation_window seconds
+        - If current count >= min_trigger_count → trigger alert
+        - Deduplicate: set a separate Redis flag "rule_alerted:{rule_name}:{group_by_value}"
+          with TTL = evaluation_window to prevent repeated alerts
+```
+
+### 11.4 Backward Compatibility
+
+All new fields have empty/zero/default values. Existing rules with no filters set match all logs (same behavior as today). The `count_based` field defaults to `0` (off), so existing rules evaluate per-log as before.
+
+### 11.5 Frontend — Updated Rule Form
+
+Add collapsible "Advanced API Selection" section between the Condition Target Metric and Trigger Criteria fields in the rule creation form with inputs for all filter fields. The rule display card shows active filter criteria as small badges below the metric threshold.
+
+---
+
+## 12. Notification Engine
+
+### 12.1 Motivation
+
+Currently, alerts are only delivered in-app via Frappe WebSockets (`publish_alert` → `security_anomaly_triggered` event). There is no mechanism to route alerts to external notification channels (Email, Slack, Discord, SMS, Teams, Whatsapp, Telegram). Operators must be logged into the Frappe dashboard to see alerts, which limits the app's utility as a real-time monitoring tool.
+
+A notification engine is required to:
+- Route triggered alerts to one or more external channels based on rule-channel mappings
+- Support configurable channels with channel-specific parameters (webhook URLs, API keys, SMTP config, etc.)
+- Queue notifications asynchronously with retry on failure
+- Maintain an audit log of all notifications sent
+
+### 12.2 New DocTypes
+
+#### 12.2.1 Notification Channel
+
+| Field | Type | Notes |
+|---|---|---|
+| `channel_name` | Data | Unique, required, autoname |
+| `channel_type` | Select | `discord\nemail\nslack\nsms\nteams\nwhatsapp\ntelegram\nhttp` |
+| `is_active` | Check | Default 1 |
+| `rate_limit_per_minute` | Int | Default 60 — max messages per minute through this channel |
+| `config_json` | Code (JSON) | Channel-specific configuration payload |
+
+**Channel-type-specific config fields** stored in `config_json`:
+
+| Channel Type | Config Fields |
+|---|---|
+| `discord` | `{"webhook_url": "..."}` |
+| `email` | `{"smtp_host": "...", "smtp_port": 587, "smtp_user": "...", "smtp_password": "...", "from_email": "...", "to_emails": ["..."], "use_tls": true}` |
+| `slack` | `{"webhook_url": "..."}` or `{"bot_token": "...", "channel_id": "..."}` |
+| `teams` | `{"webhook_url": "..."}` |
+| `telegram` | `{"bot_token": "...", "chat_id": "..."}` |
+| `whatsapp` | `{"api_endpoint": "...", "api_key": "...", "phone_number_id": "...", "to_number": "..."}` |
+| `sms` | `{"provider": "twilio", "account_sid": "...", "auth_token": "...", "from_number": "...", "to_number": "..."}` |
+| `http` | `{"url": "...", "method": "POST", "headers": {...}, "template": "..."}` |
+
+#### 12.2.2 Security Alert Rule Notification (Child Table)
+
+A child table DocType added to `Security Alert Rule` via a Table field `notifications`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `channel` | Link → Notification Channel | Required |
+| `enabled` | Check | Default 1 |
+
+This creates a many-to-many relationship between rules and channels.
+
+#### 12.2.3 Notification Queue Item
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | Data | Notification title |
+| `severity` | Select | `info\nwarning\ncritical` |
+| `payload` | Code (JSON) | Full notification payload |
+| `channel` | Link → Notification Channel | Target channel |
+| `alert_instance` | Link → Alert Instance | The alert that triggered this |
+| `rule` | Link → Security Alert Rule | Rule that triggered it |
+| `status` | Select | `pending\nsending\nsent\nfailed\nretrying` |
+| `retry_count` | Int | Default 0, max 3 |
+| `last_error` | Small Text | Error message from last attempt |
+| `next_retry_at` | Datetime | When to retry |
+| `sent_at` | Datetime | When successfully sent |
+| `created_at` | Datetime | Default Now |
+
+#### 12.2.4 Notification Log
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | Data | Notification title |
+| `channel` | Link → Notification Channel | |
+| `channel_type` | Read-only Data | Copied from channel at send time |
+| `severity` | Select | |
+| `rule` | Link → Security Alert Rule | |
+| `alert_instance` | Link → Alert Instance | |
+| `status` | Select | `sent\nfailed\nretried` |
+| `response` | Code (JSON) | API response from channel |
+| `error_message` | Small Text | |
+| `attempts` | Int | Total attempts made |
+| `sent_at` | Datetime | |
+| `created_at` | Datetime | Default Now |
+
+### 12.3 New Python Modules
+
+#### 12.3.1 `notification/adapter_base.py` — Abstract Adapter Interface
+
+```python
+from abc import ABC, abstractmethod
+
+class NotificationAdapter(ABC):
+    @abstractmethod
+    def send(self, payload: dict, config: dict) -> dict:
+        """
+        Send notification through the channel.
+        Returns: {'success': bool, 'response': ..., 'error': ...}
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def validate_config(cls, config: dict) -> list[str]:
+        """
+        Validate channel-specific config.
+        Returns list of error messages (empty = valid).
+        """
+        pass
+```
+
+#### 12.3.2 `notification/adapters/` — Concrete Adapters
+
+| File | Adapter Class | Channel | Key Config |
+|---|---|---|---|
+| `adapters/discord.py` | `DiscordAdapter` | Discord | `webhook_url` |
+| `adapters/email.py` | `EmailAdapter` | Email | `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `from_email`, `to_emails`, `use_tls` |
+| `adapters/slack.py` | `SlackAdapter` | Slack | `webhook_url` |
+| `adapters/teams.py` | `TeamsAdapter` | Microsoft Teams | `webhook_url` |
+| `adapters/telegram.py` | `TelegramAdapter` | Telegram | `bot_token`, `chat_id` |
+| `adapters/whatsapp.py` | `WhatsAppAdapter` | WhatsApp (Meta Cloud API) | `api_endpoint`, `api_key`, `phone_number_id`, `to_number` |
+| `adapters/sms.py` | `SMSAdapter` | SMS | `provider`, `account_sid`, `auth_token`, `from_number`, `to_number` |
+| `adapters/http.py` | `HTTPAdapter` | Generic HTTP | `url`, `method`, `headers`, `template` |
+
+Each adapter implements `send(payload, config)` and `validate_config(config)`. The `send()` method returns `{'success': True/False, 'response': ..., 'error': ...}`.
+
+Email adapter uses Frappe's built-in `frappe.sendmail` if SMTP is not configured, otherwise uses its own SMTP connection from the channel config.
+
+SMS/Telegram/WhatsApp adapters can be stubs that log to `frappe.logger()` with a "not implemented" warning.
+
+#### 12.3.3 `notification/__init__.py` — Factory + Dispatcher
+
+```python
+def get_adapter(channel_type: str) -> NotificationAdapter:
+    """Factory: returns the correct adapter for channel_type"""
+
+def dispatch_notification(alert_doc, rule_name: str):
+    """
+    Called when an Alert Instance is created.
+    1. Query rule's child table `notifications` for enabled channels
+    2. For each mapped channel, create a Notification Queue Item
+    3. Enqueue `send_queued_notification` for each item via frappe.enqueue
+    """
+```
+
+#### 12.3.4 `notification/queue.py` — Queue Processing + Retry
+
+```python
+def send_queued_notification(queue_item_name: str):
+    """
+    - Fetch Notification Queue Item
+    - Set status = 'sending'
+    - Fetch channel config
+    - Resolve adapter via get_adapter(channel_type)
+    - Build payload from template / alert data
+    - Call adapter.send(payload, config)
+    - On success: status = 'sent', create Notification Log, record response
+    - On failure: increment retry_count, set status = 'retrying'/'failed',
+      set next_retry_at, log error in Notification Log
+    """
+
+def retry_failed_notifications():
+    """
+    Scheduled cron task (every 5 minutes):
+    - Find items with status='retrying', retry_count < 3, next_retry_at <= now
+    - Enqueue send_queued_notification for each
+    """
+
+def _enforce_rate_limit(channel_name: str, max_per_minute: int) -> bool:
+    """
+    Redis-based rate limiter using sliding window counter.
+    Returns True if message is allowed, False if rate-limited.
+    """
+```
+
+### 12.4 Integration Points
+
+#### 12.4.1 doc_events.py
+
+Add `doc_events` entry for `Alert Instance`:
+
+```python
+"Alert Instance": {
+    "after_insert": "armure_apim_sentinel.notification.dispatch_notification"
+}
+```
+
+Alternatively, call `dispatch_notification()` directly from `tasks.py` right after `frappe.new_doc("Alert Instance").insert()` to avoid the document event overhead. The plan is to wire it in `tasks.py` for reliability.
+
+#### 12.4.2 hooks.py
+
+1. Add scheduler cron for retry:
+```python
+scheduler_events = {
+    "cron": {
+        "*/1 * * * *": ["armure_apim_sentinel.tasks.generate_simulated_logs"],
+        "*/5 * * * *": ["armure_apim_sentinel.notification.queue.retry_failed_notifications"],
+    }
+}
+```
+
+2. Add permission hooks for the 4 new DocTypes:
+```python
+permission_query_conditions = {
+    ...
+    "Notification Channel": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+    "Notification Queue Item": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+    "Notification Log": "armure_apim_sentinel.permissions.get_permission_query_conditions",
+}
+
+has_permission = {
+    ...
+    "Notification Channel": "armure_apim_sentinel.permissions.has_permission",
+    "Notification Queue Item": "armure_apim_sentinel.permissions.has_permission",
+    "Notification Log": "armure_apim_sentinel.permissions.has_permission",
+}
+```
+
+3. Add the new `Notification` module to `modules.txt` (or include as a sub-module).
+
+#### 12.4.3 install.py — Seed Data
+
+Seed two notification channels:
+- "Email Alert" — type=email, enabled, default SMTP config
+- "Slack Alert" — type=slack, enabled, placeholder webhook URL
+
+#### 12.4.4 Security Alert Rule JSON
+
+Add child table field `notifications` to the Security Alert Rule DocType:
+```json
+{
+    "fieldname": "notifications",
+    "fieldtype": "Table",
+    "label": "Notification Channels",
+    "options": "Security Alert Rule Notification"
+}
+```
+
+Update `field_order` to place it after `section_evaluation` / `group_by`.
+
+### 12.5 API Endpoints (`api/notifications.py`)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `list_channels` | GET | List all Notification Channels |
+| `create_channel` | POST | Create channel (validates config via adapter) |
+| `toggle_channel` | POST | Activate/deactivate channel |
+| `delete_channel` | POST | Delete channel |
+| `test_channel` | POST | Send test notification through a channel |
+| `list_queue` | GET | View pending/failed notification queue items |
+| `retry_queue_item` | POST | Manually retry a single queued item |
+| `list_notification_logs` | GET | Paginated notification audit log |
+
+### 12.6 Notification Flow
+
+```
+Log ingested → rule evaluation → Alert Instance created
+    ↓
+dispatch_notification()
+    ↓ query rule → Security Alert Rule Notification (child table)
+    ↓ for each enabled channel:
+    ↓
+Create Notification Queue Item (status=pending)
+    ↓ frappe.enqueue("send_queued_notification", queue_item_name)
+    ↓
+send_queued_notification()
+    ↓
+1. Rate limit check (Redis sliding window)
+2. Resolve adapter from channel type
+3. Build payload from alert data + channel template
+4. adapter.send(payload, config)
+    ├── Success → Notification Log (status=sent), Queue Item (status=sent)
+    └── Failure → Queue Item (status=retrying/failed, retry_count++),
+                   Notification Log (status=failed/retried)
+    ↓ retry cron (every 5 min)
+retry_failed_notifications() → re-enqueue items with retry_count < 3
+```
+
+### 12.7 Frontend — Notification Management Page
+
+A new Vue page at route `/api-security-monitor/notifications` with three tabs:
+
+**Tab 1: Channels** — Card list of configured notification channels.
+- Each card shows: channel name, type badge, active status toggle, last test result
+- "Add Channel" button opens a form dialog
+- Form: channel name + type selector → config fields rendered dynamically per type
+- Config validation hint from adapter (shown inline)
+- "Test" button on each channel sends a test notification
+
+**Tab 2: Queue** — Table of pending/failed queue items.
+- Columns: title, channel, status badge, retry count, next retry, created at
+- "Retry" button on failed items
+- Filter by status (pending/sending/sent/failed/retrying)
+
+**Tab 3: Logs** — Filterable audit log of sent notifications.
+- Columns: title, channel, channel type, severity, status, attempts, sent at, response preview
+- Expandable row showing full response JSON
+
+**Navigation**: Add a "Notifications" link to the sidebar (AppSidebar.vue).
+
+### 12.8 Implementation Order
+
+| Step | Description |
+|---|---|
+| 12.8.1 | Create `notification/adapter_base.py` — abstract base class |
+| 12.8.2 | Implement `DiscordAdapter`, `SlackAdapter`, `EmailAdapter`, `HTTPAdapter` |
+| 12.8.3 | Create stub adapters: TeamsAdapter, TelegramAdapter, WhatsAppAdapter, SMSAdapter |
+| 12.8.4 | Create `Notification Channel` DocType JSON + Python stub |
+| 12.8.5 | Create `Security Alert Rule Notification` child DocType |
+| 12.8.6 | Add child table `notifications` to `Security Alert Rule` JSON |
+| 12.8.7 | Create `Notification Queue Item` DocType |
+| 12.8.8 | Create `Notification Log` DocType |
+| 12.8.9 | Run `bench migrate` |
+| 12.8.10 | Implement `notification/__init__.py` — factory + `dispatch_notification()` |
+| 12.8.11 | Implement `notification/queue.py` — `send_queued_notification()`, `retry_failed_notifications()`, rate limiter |
+| 12.8.12 | Wire dispatch into `tasks.py` after Alert Instance creation |
+| 12.8.13 | Add retry cron + permission hooks to `hooks.py` |
+| 12.8.14 | Create `api/notifications.py` — all 8 endpoints |
+| 12.8.15 | Update `install.py` — seed 2 channels (Email + Slack) |
+| 12.8.16 | Build frontend: NotificationsPage.vue (3 tabs + sidebar link) |
+| 12.8.17 | Add Notifications route to `router.js` |
+| 12.8.18 | Run `bench migrate` + `bench build --app armure_apim_sentinel` + integration test |
+
+### 12.9 Rate Limiting Strategy
+
+Per-channel rate limiting is enforced using a Redis sorted set sliding window:
+
+```python
+def _enforce_rate_limit(channel: str, max_per_minute: int) -> bool:
+    now = time.time()
+    key = f"rate_limit:{channel}"
+    pipe = frappe.cache().redis.pipeline()
+    pipe.zremrangebyscore(key, 0, now - 60)  # remove entries older than 60s
+    pipe.zcard(key)                           # count in window
+    pipe.zadd(key, {str(now): now})           # add current request
+    pipe.expire(key, 60)                      # ensure TTL
+    _, count, _, _ = pipe.execute()
+    return count <= max_per_minute
+```
+
+### 12.10 Adapter Template System
+
+Each channel adapter can define a default notification template. The `HTTPAdapter` allows a user-defined `template` field in `config_json` using a simple `{key}` substitution syntax:
+
+```
+Template: "Alert {severity}: {title}\nRule: {rule}\nMessage: {message}"
+Variables available: severity, title, rule, message, timestamp, channel, rule_url, alert_details
+```
+
+This template is rendered with the alert data before being sent.
+
+For Discord/Slack, the template renders into the message content field. For Email, it renders the email body. For HTTP, it renders the request body (or can be JSON with template substitution).
+
+### 12.11 Verification Checklist
+
+- [ ] Notification Channel CRUD works (create, read, update, delete)
+- [ ] Validate config via adapter returns errors for missing required fields
+- [ ] Test notification sends correctly for each adapter
+- [ ] New Alert Instance triggers dispatch to mapped channels
+- [ ] Queue item created with status=pending
+- [ ] `send_queued_notification` processes queue items correctly
+- [ ] Failed sends increment retry_count, set next_retry_at
+- [ ] Retry cron picks up failed items and re-enqueues
+- [ ] After 3 failures, status set to "failed" with final error
+- [ ] Rate limiter prevents exceeding per-minute threshold
+- [ ] Notification Log captures all sends (success + failure)
+- [ ] Notification Log can be filtered and searched
+- [ ] Frontend: channels tab lists/add/delete/test works
+- [ ] Frontend: queue tab shows pending/failed items with retry
+- [ ] Frontend: logs tab shows audit trail with expandable rows
+- [ ] Frontend: sidebar shows "Notifications" link
+- [ ] Existing alerts flow unchanged when no channels configured
+- [ ] Rule-card shows linked channels count/badges
+- [ ] Many-to-many mapping: one rule → multiple channels, one channel → multiple rules
