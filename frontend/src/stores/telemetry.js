@@ -76,11 +76,7 @@ export const useTelemetryStore = defineStore("telemetry", () => {
 
   async function fetchRules() {
     try {
-      rules.value = await api.call("frappe.client.get_list", {
-        doctype: "Security Alert Rule",
-        fields: JSON.stringify(["name", "rule_name", "metric", "condition", "threshold", "severity", "is_active"]),
-        filters: JSON.stringify({}),
-      })
+      rules.value = await api.call("armure_apim_sentinel.api.alerts.list_rules")
     } catch (e) {
       console.error("Rules fetch failed:", e)
     }

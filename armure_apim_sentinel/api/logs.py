@@ -1,7 +1,6 @@
 import frappe
 from frappe import _
 
-from armure_apim_sentinel.decorators import whitelist
 from armure_apim_sentinel.opensearch_client import search_logs, index_log, get_client
 
 
@@ -18,7 +17,7 @@ def query_logs(
 	page=1,
 	page_size=50,
 ):
-	return search_logs(
+	result = search_logs(
 		search=search,
 		source=source,
 		status=status,
@@ -30,6 +29,8 @@ def query_logs(
 		page=page,
 		page_size=page_size,
 	)
+	result["logs"] = [_map_log_fields(log) for log in result.get("logs", [])]
+	return result
 
 
 @frappe.whitelist(allow_guest=True, methods="POST")
@@ -66,3 +67,22 @@ def ingest_logs():
 	)
 
 	return {"status": "ok", "ingested": len(logs)}
+
+
+_FIELD_MAP = {
+	"user_agent": "userAgent",
+	"payload_size": "payloadSize",
+	"user_id": "userId",
+	"rate_limit_remaining": "rateLimitRemaining",
+	"rate_limit_limit": "rateLimitLimit",
+	"response_body": "responseBody",
+}
+
+
+def _map_log_fields(log):
+	if not isinstance(log, dict):
+		return log
+	mapped = {}
+	for k, v in log.items():
+		mapped[_FIELD_MAP.get(k, k)] = v
+	return mapped

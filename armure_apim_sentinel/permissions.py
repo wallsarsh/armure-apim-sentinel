@@ -15,14 +15,20 @@ def get_permission_query_conditions(user=None):
 	if "System Manager" in frappe.get_roles(user):
 		return ""
 
-	return f"""(`tab{user}`.`owner` = {frappe.db.escape(user)})"""
+	return ""
 
 
-def has_permission(doctype, ptype="read", user=None):
+def has_permission(doctype=None, ptype="read", user=None, doc=None, **kwargs):
 	if not user:
 		user = frappe.session.user
 
-	if doctype not in VALID_DOCTYPES:
+	dt = doctype
+	if not dt and doc:
+		dt = doc.doctype
+	if not dt:
+		return False
+
+	if dt not in VALID_DOCTYPES:
 		return False
 
 	if "System Manager" in frappe.get_roles(user):

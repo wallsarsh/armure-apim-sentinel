@@ -184,6 +184,15 @@ def aggregate_dashboard(period=24):
 
 	indices = ",".join([_daily_index(now - timedelta(days=i)) for i in range(max(1, int(period) // 24 + 1))])
 
+	STATUS_DESCRIPTIONS = {
+		"200": "OK", "201": "Created", "204": "No Content", "301": "Moved",
+		"304": "Not Modified", "400": "Bad Request", "401": "Unauthorized",
+		"403": "Forbidden", "404": "Not Found", "405": "Method Not Allowed",
+		"408": "Timeout", "409": "Conflict", "422": "Unprocessable",
+		"429": "Rate Limited", "500": "Server Error", "502": "Bad Gateway",
+		"503": "Service Unavailable",
+	}
+
 	query = {
 		"size": 0,
 		"query": {"range": {"timestamp": {"gte": start_time}}},
@@ -194,7 +203,14 @@ def aggregate_dashboard(period=24):
 			"rate_limit_count": {"filter": {"term": {"status": 429}}},
 			"status_breakdown": {"terms": {"field": "status", "size": 20}},
 			"source_breakdown": {"terms": {"field": "source", "size": 20}},
-			"path_breakdown": {"terms": {"field": "path", "size": 20}},
+			"path_breakdown": {
+				"terms": {"field": "path", "size": 20},
+				"aggs": {
+					"avg_latency": {"avg": {"field": "latency"}},
+					"error_count": {"filter": {"range": {"status": {"gte": 400}}}},
+					"top_method": {"top_hits": {"size": 1, "_source": {"includes": ["method"]}}},
+				},
+			},
 			"timeline": {
 				"date_histogram": {
 					"field": "timestamp",
@@ -230,20 +246,65 @@ def aggregate_dashboard(period=24):
 			{
 				"timestamp": bucket.get("key_as_string"),
 				"count": bucket.get("doc_count"),
-				"avgLatency": round(bucket.get("avg_latency", {}).get("value") or 0, 1),
+				"success": bucket.get("doc_count") - bucket.get("error_count", {}).get("doc_count", 0),
 				"errors": bucket.get("error_count", {}).get("doc_count", 0),
+				"avgLatency": round(bucket.get("avg_latency", {}).get("value") or 0, 1),
+				"timeLabel": _format_timeline_label(bucket.get("key_as_string")),
 			}
 			for bucket in aggs.get("timeline", {}).get("buckets", [])
 		]
 	}
 
+	statuses = [
+		{
+			"code": int(b["key"]),
+			"count": b["doc_count"],
+			"description": STATUS_DESCRIPTIONS.get(str(b["key"]), "Unknown"),
+		}
+		for b in aggs.get("status_breakdown", {}).get("buckets", [])
+	]
+
+	endpoints = []
+	for b in aggs.get("path_breakdown", {}).get("buckets", []):
+		path = b["key"]
+		hits = b["doc_count"]
+		avg_latency = (b.get("avg_latency", {}).get("value") or 0)
+		errors = b.get("error_count", {}).get("doc_count", 0)
+		error_rate = round((errors / hits * 100) if hits else 0, 1)
+		method = "GET"
+		try:
+			th = b.get("top_method", {}).get("hits", {}).get("hits", [])
+			if th:
+				method = th[0].get("_source", {}).get("method", "GET")
+		except Exception:
+			pass
+		endpoints.append({
+			"method": method,
+			"path": path,
+			"hits": hits,
+			"avgLatency": round(avg_latency, 1),
+			"errorRate": error_rate,
+		})
+
 	breakdown = {
 		"bySource": {b["key"]: b["doc_count"] for b in aggs.get("source_breakdown", {}).get("buckets", [])},
+		"statuses": statuses,
+		"endpoints": endpoints,
 		"byStatus": {str(b["key"]): b["doc_count"] for b in aggs.get("status_breakdown", {}).get("buckets", [])},
 		"byPath": {b["key"]: b["doc_count"] for b in aggs.get("path_breakdown", {}).get("buckets", [])},
 	}
 
 	return {"summary": summary, "charts": charts, "breakdown": breakdown}
+
+
+def _format_timeline_label(ts_str):
+	if not ts_str:
+		return ""
+	try:
+		dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+		return dt.strftime("%H:%M")
+	except Exception:
+		return ts_str
 
 
 def _calc_success_rate(aggs):
@@ -258,5 +319,5 @@ def _empty_dashboard():
 	return {
 		"summary": {"totalRequests": 0, "avgLatency": 0, "successRate": 100, "errorCount": 0, "rateLimitCount": 0, "activeAlerts": 0},
 		"charts": {"timeline": []},
-		"breakdown": {"bySource": {}, "byStatus": {}, "byPath": {}},
+		"breakdown": {"bySource": {}, "byStatus": {}, "byPath": {}, "statuses": [], "endpoints": []},
 	}

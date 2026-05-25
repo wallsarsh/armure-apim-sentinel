@@ -36,7 +36,7 @@ scheduler_events = {
 
 doc_events = {
 	"Security Alert Rule": {
-		"on_update": "armure_apim_sentinel.doc_events.invalidate_rules_cache",
+		"on_update": "armure_apim_sentinel.doc_events.clear_rules_cache",
 	}
 }
 
