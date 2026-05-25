@@ -68,6 +68,19 @@ def create_rule():
 	doc.threshold = data.get("threshold")
 	doc.severity = data.get("severity", "warning")
 	doc.is_active = 1
+
+	filter_fields = [
+		"filter_method", "filter_path_pattern", "filter_path_search_type",
+		"filter_source", "filter_ip_range",
+		"filter_user_agent_pattern", "filter_user_agent_search_type",
+		"filter_min_payload", "filter_max_payload",
+		"filter_status_min", "filter_status_max",
+		"count_based", "evaluation_window", "min_trigger_count", "group_by",
+	]
+	for field in filter_fields:
+		if field in data:
+			doc.set(field, data.get(field))
+
 	doc.insert(ignore_permissions=True)
 
 	return {"status": "created", "name": doc.name}
@@ -104,7 +117,15 @@ def delete_rule():
 def list_rules():
 	rules = frappe.get_all(
 		"Security Alert Rule",
-		fields=["name", "rule_name", "metric", "condition", "threshold", "severity", "is_active"],
+		fields=[
+			"name", "rule_name", "metric", "condition", "threshold", "severity", "is_active",
+			"filter_method", "filter_path_pattern", "filter_path_search_type",
+			"filter_source", "filter_ip_range",
+			"filter_user_agent_pattern", "filter_user_agent_search_type",
+			"filter_min_payload", "filter_max_payload",
+			"filter_status_min", "filter_status_max",
+			"count_based", "evaluation_window", "min_trigger_count", "group_by",
+		],
 		order_by="creation asc",
 	)
 	return rules

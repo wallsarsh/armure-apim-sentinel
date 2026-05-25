@@ -4,7 +4,7 @@
  "autoname": "field:rule_name",
  "creation": "2025-05-25 00:00:00",
  "default_view": null,
- "description": "Threshold-based alert rule for API monitoring",
+ "description": "Threshold-based alert rule with API selection filters and count-based evaluation",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
@@ -16,7 +16,25 @@
   "column_break_swsp",
   "duration",
   "severity",
-  "is_active"
+  "is_active",
+  "section_filters",
+  "filter_method",
+  "filter_path_pattern",
+  "filter_path_search_type",
+  "filter_source",
+  "filter_ip_range",
+  "filter_user_agent_pattern",
+  "filter_user_agent_search_type",
+  "filter_min_payload",
+  "filter_max_payload",
+  "filter_status_min",
+  "filter_status_max",
+  "column_break_filters",
+  "section_evaluation",
+  "count_based",
+  "evaluation_window",
+  "min_trigger_count",
+  "group_by"
  ],
  "fields": [
   {
@@ -72,6 +90,111 @@
    "fieldtype": "Check",
    "label": "Is Active",
    "default": 1
+  },
+  {
+   "fieldname": "section_filters",
+   "fieldtype": "Section Break",
+   "label": "API Selection Filters"
+  },
+  {
+   "fieldname": "filter_method",
+   "fieldtype": "Select",
+   "label": "HTTP Method",
+   "options": "Any\nGET\nPOST\nPUT\nDELETE\nPATCH"
+  },
+  {
+   "fieldname": "filter_path_pattern",
+   "fieldtype": "Data",
+   "label": "Path Pattern",
+   "description": "Glob pattern (e.g. /api/v1/users/*) or regex with re: prefix"
+  },
+  {
+   "fieldname": "filter_path_search_type",
+   "fieldtype": "Select",
+   "label": "Path Search Type",
+   "options": "glob\nregex"
+  },
+  {
+   "fieldname": "filter_source",
+   "fieldtype": "Link",
+   "label": "Source Channel",
+   "options": "Log Ingest Adapter"
+  },
+  {
+   "fieldname": "filter_ip_range",
+   "fieldtype": "Data",
+   "label": "IP Range (CIDR)",
+   "description": "Comma-separated CIDR notations, e.g. 10.0.0.0/8,192.168.1.0/24"
+  },
+  {
+   "fieldname": "filter_user_agent_pattern",
+   "fieldtype": "Data",
+   "label": "User-Agent Pattern",
+   "description": "Glob or regex pattern on User-Agent header"
+  },
+  {
+   "fieldname": "filter_user_agent_search_type",
+   "fieldtype": "Select",
+   "label": "User-Agent Search Type",
+   "options": "glob\nregex"
+  },
+  {
+   "fieldname": "filter_min_payload",
+   "fieldtype": "Int",
+   "label": "Min Payload (bytes)",
+   "default": 0
+  },
+  {
+   "fieldname": "filter_max_payload",
+   "fieldtype": "Int",
+   "label": "Max Payload (bytes)",
+   "default": 0
+  },
+  {
+   "fieldname": "filter_status_min",
+   "fieldtype": "Int",
+   "label": "Min Status Code",
+   "default": 0
+  },
+  {
+   "fieldname": "filter_status_max",
+   "fieldtype": "Int",
+   "label": "Max Status Code",
+   "default": 0
+  },
+  {
+   "fieldname": "column_break_filters",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_evaluation",
+   "fieldtype": "Section Break",
+   "label": "Enhanced Evaluation"
+  },
+  {
+   "fieldname": "count_based",
+   "fieldtype": "Check",
+   "label": "Count-Based Evaluation",
+   "description": "Use sliding window count instead of per-log threshold check"
+  },
+  {
+   "fieldname": "evaluation_window",
+   "fieldtype": "Int",
+   "label": "Evaluation Window (minutes)",
+   "default": 5
+  },
+  {
+   "fieldname": "min_trigger_count",
+   "fieldtype": "Int",
+   "label": "Min Trigger Count",
+   "default": 1,
+   "description": "Minimum matching logs in window to trigger alert"
+  },
+  {
+   "fieldname": "group_by",
+   "fieldtype": "Select",
+   "label": "Group By",
+   "options": "none\nsource\nip\npath\nmethod"
   }
  ],
  "force_re_creation_of_tables": 0,
@@ -82,7 +205,7 @@
    "link_fieldname": "rule"
   }
  ],
- "modified": "2025-05-25 00:00:00",
+ "modified": "2026-05-25 00:00:00",
  "modified_by": "Administrator",
  "module": "Armure APIM Sentinel",
  "name": "Security Alert Rule",

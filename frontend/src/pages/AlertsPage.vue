@@ -110,8 +110,103 @@
               </select>
             </div>
           </div>
+          <!-- Advanced API Selection -->
+          <div class="border-t border-zinc-800 pt-3">
+            <button type="button" @click="showAdvancedFilters = !showAdvancedFilters" class="flex items-center gap-2 text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer">
+              <span class="font-mono font-bold">{{ showAdvancedFilters ? '▾' : '▸' }}</span>
+              <span class="font-semibold">Advanced API Selection</span>
+            </button>
+          </div>
+          <template v-if="showAdvancedFilters">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">HTTP Method</label>
+                <select v-model="newRule.filter_method" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="Any">Any</option>
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Path Pattern</label>
+                <input type="text" placeholder="e.g. /api/v1/users/* or re:^/api" v-model="newRule.filter_path_pattern" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Path Search</label>
+                <select v-model="newRule.filter_path_search_type" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="glob">Glob</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Source Channel</label>
+                <input type="text" placeholder="Leave empty for all" v-model="newRule.filter_source" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">IP Range (CIDR)</label>
+                <input type="text" placeholder="10.0.0.0/8,192.168.1.0/24" v-model="newRule.filter_ip_range" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">User-Agent Pattern</label>
+                <input type="text" placeholder="*Mozilla* or re:bot" v-model="newRule.filter_user_agent_pattern" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">UA Search</label>
+                <select v-model="newRule.filter_user_agent_search_type" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="glob">Glob</option>
+                  <option value="regex">Regex</option>
+                </select>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Payload (bytes)</label>
+                <input type="number" v-model.number="newRule.filter_min_payload" min="0" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Max Payload (bytes)</label>
+                <input type="number" v-model.number="newRule.filter_max_payload" min="0" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Status Code</label>
+                <input type="number" v-model.number="newRule.filter_status_min" min="0" max="599" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Max Status Code</label>
+                <input type="number" v-model.number="newRule.filter_status_max" min="0" max="599" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+            </div>
+            <div class="border-t border-zinc-800 pt-3 mt-2">
+              <span class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Enhanced Evaluation</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs mt-2">
+              <div class="flex items-center gap-2 pt-2">
+                <input type="checkbox" id="cb" v-model="newRule.count_based" class="accent-emerald-500" />
+                <label for="cb" class="text-zinc-400 text-xs font-medium cursor-pointer">Count-Based Evaluation</label>
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Window (min)</label>
+                <input type="number" v-model.number="newRule.evaluation_window" min="1" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Min Trigger Count</label>
+                <input type="number" v-model.number="newRule.min_trigger_count" min="1" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500 font-mono" />
+              </div>
+              <div class="space-y-1">
+                <label class="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Group By</label>
+                <select v-model="newRule.group_by" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white focus:outline-none focus:border-emerald-500">
+                  <option value="none">None (Global)</option>
+                  <option value="source">Source Channel</option>
+                  <option value="ip">Client IP</option>
+                  <option value="path">API Path</option>
+                  <option value="method">HTTP Method</option>
+                </select>
+              </div>
+            </div>
+          </template>
           <div class="flex justify-end gap-2 text-xs pt-2">
-            <button type="button" @click="showAddRule = false" class="px-3.5 py-2 hover:bg-zinc-800 text-zinc-400 border border-transparent rounded-lg cursor-pointer font-medium">Cancel</button>
+            <button type="button" @click="showAddRule = false; showAdvancedFilters = false" class="px-3.5 py-2 hover:bg-zinc-800 text-zinc-400 border border-transparent rounded-lg cursor-pointer font-medium">Cancel</button>
             <button type="submit" class="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-950 rounded-lg cursor-pointer font-bold">Deploy Policy Rule</button>
           </div>
         </form>
@@ -125,7 +220,17 @@
               <div class="mt-3 text-xs bg-zinc-950 border border-zinc-800/40 p-2.5 rounded-lg space-y-1 font-mono text-zinc-400">
                 <div>Policy Metric: <span class="text-zinc-300">{{ ru.metric }}</span></div>
                 <div>Evaluator: <span class="text-zinc-300">{{ ru.condition === 'gt' ? '>' : ru.condition === 'lt' ? '<' : '=' }} {{ ru.threshold || ru.value }}</span></div>
-                <div>Policy window: <span class="text-zinc-300">Continuous 10-Min Scan</span></div>
+                <div v-if="ru.count_based" class="text-amber-400">Evaluation: Count-based ({{ ru.min_trigger_count }} hits in {{ ru.evaluation_window }}min{{ ru.group_by !== 'none' ? ', grouped by ' + ru.group_by : '' }})</div>
+                <div v-else>Policy window: <span class="text-zinc-300">Per-log continuous</span></div>
+              </div>
+              <div v-if="showRuleFilters(ru)" class="flex flex-wrap gap-1.5 mt-2">
+                <span v-if="ru.filter_method && ru.filter_method !== 'Any'" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">METHOD: {{ ru.filter_method }}</span>
+                <span v-if="ru.filter_path_pattern" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">{{ ru.filter_path_search_type === 'regex' ? 'REGEX' : 'PATH' }}: {{ ru.filter_path_pattern }}</span>
+                <span v-if="ru.filter_source" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">SOURCE: {{ ru.filter_source }}</span>
+                <span v-if="ru.filter_ip_range" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">CIDR: {{ ru.filter_ip_range }}</span>
+                <span v-if="ru.filter_user_agent_pattern" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">UA: {{ ru.filter_user_agent_pattern }}</span>
+                <span v-if="ru.filter_min_payload > 0 || ru.filter_max_payload > 0" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">PAYLOAD: {{ ru.filter_min_payload || 0 }}-{{ ru.filter_max_payload || '∞' }}</span>
+                <span v-if="ru.filter_status_min > 0 || ru.filter_status_max > 0" class="text-[10px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono border border-zinc-700/40">STATUS: {{ ru.filter_status_min || 0 }}-{{ ru.filter_status_max || 599 }}</span>
               </div>
             </div>
             <div class="flex justify-between items-center text-xs mt-4 pt-3 border-t border-zinc-800/40">
@@ -257,7 +362,16 @@ const tabs = [
 
 const activeAlerts = computed(() => telemetry.alerts.filter(a => !a.resolved))
 
-const newRule = ref({ name: "", metric: "latency", condition: "gt", value: 500, severity: "warning" })
+const showAdvancedFilters = ref(false)
+
+const newRule = ref({ name: "", metric: "latency", condition: "gt", value: 500, severity: "warning",
+  filter_method: "Any", filter_path_pattern: "", filter_path_search_type: "glob",
+  filter_source: "", filter_ip_range: "",
+  filter_user_agent_pattern: "", filter_user_agent_search_type: "glob",
+  filter_min_payload: 0, filter_max_payload: 0,
+  filter_status_min: 0, filter_status_max: 0,
+  count_based: false, evaluation_window: 5, min_trigger_count: 1, group_by: "none",
+})
 
 const safeScore = computed(() => {
   const r = currentReport.value
@@ -307,6 +421,13 @@ async function runScan() {
   }
 }
 
+function showRuleFilters(ru) {
+  return ru.filter_method || ru.filter_path_pattern || ru.filter_source || ru.filter_ip_range
+    || ru.filter_user_agent_pattern || ru.filter_min_payload > 0 || ru.filter_max_payload > 0
+    || ru.filter_status_min > 0 || ru.filter_status_max > 0
+    || ru.count_based
+}
+
 function loadReport(r) {
   currentReport.value = r
 }
@@ -323,15 +444,39 @@ async function resolveAllAlerts() {
 
 async function createRule() {
   try {
-    await api.post("armure_apim_sentinel.api.alerts.create_rule", {
+    const payload = {
       rule_name: newRule.value.name,
       metric: newRule.value.metric,
       condition: newRule.value.condition,
       threshold: newRule.value.value,
       severity: newRule.value.severity,
-    })
+      filter_method: newRule.value.filter_method === "Any" ? "" : newRule.value.filter_method,
+      filter_path_pattern: newRule.value.filter_path_pattern,
+      filter_path_search_type: newRule.value.filter_path_search_type,
+      filter_source: newRule.value.filter_source,
+      filter_ip_range: newRule.value.filter_ip_range,
+      filter_user_agent_pattern: newRule.value.filter_user_agent_pattern,
+      filter_user_agent_search_type: newRule.value.filter_user_agent_search_type,
+      filter_min_payload: newRule.value.filter_min_payload,
+      filter_max_payload: newRule.value.filter_max_payload,
+      filter_status_min: newRule.value.filter_status_min,
+      filter_status_max: newRule.value.filter_status_max,
+      count_based: newRule.value.count_based ? 1 : 0,
+      evaluation_window: newRule.value.evaluation_window,
+      min_trigger_count: newRule.value.min_trigger_count,
+      group_by: newRule.value.group_by,
+    }
+    await api.post("armure_apim_sentinel.api.alerts.create_rule", payload)
     showAddRule.value = false
-    newRule.value = { name: "", metric: "latency", condition: "gt", value: 500, severity: "warning" }
+    showAdvancedFilters.value = false
+    newRule.value = { name: "", metric: "latency", condition: "gt", value: 500, severity: "warning",
+      filter_method: "Any", filter_path_pattern: "", filter_path_search_type: "glob",
+      filter_source: "", filter_ip_range: "",
+      filter_user_agent_pattern: "", filter_user_agent_search_type: "glob",
+      filter_min_payload: 0, filter_max_payload: 0,
+      filter_status_min: 0, filter_status_max: 0,
+      count_based: false, evaluation_window: 5, min_trigger_count: 1, group_by: "none",
+    }
     await telemetry.fetchRules()
   } catch (e) { console.error(e) }
 }

@@ -51,6 +51,19 @@ def seed_default_rules():
 			"severity": "info",
 			"is_active": 1,
 		},
+		{
+			"rule_name": "Repeated 5xx Burst Detection",
+			"metric": "status_code",
+			"condition": "gt",
+			"threshold": 499,
+			"severity": "critical",
+			"is_active": 1,
+			"count_based": 1,
+			"evaluation_window": 5,
+			"min_trigger_count": 3,
+			"filter_status_min": 500,
+			"group_by": "path",
+		},
 	]
 	for rule in defaults:
 		if not frappe.db.exists("Security Alert Rule", {"rule_name": rule["rule_name"]}):
