@@ -2,14 +2,14 @@
   <div class="space-y-6">
     <!-- Date Range Filter -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-5 shadow-sm">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 font-mono text-xs">
-        <div class="flex items-center gap-2.5">
+      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-4 font-mono text-xs">
+        <div class="flex items-center gap-2.5 shrink-0">
           <div class="p-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
             <Calendar class="h-4.5 w-4.5" />
           </div>
           <div>
             <h4 class="text-white font-bold text-xs uppercase tracking-wider">Dashboard Historical Lens</h4>
-            <p class="text-[10px] text-zinc-400">Click a chart data point or drag to zoom to isolate specific time ranges</p>
+            <p class="text-[10px] text-zinc-400">Click a chart data point, drag to zoom, or enter a custom time range</p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -19,7 +19,18 @@
           </button>
         </div>
       </div>
-      <div v-if="telemetry.timeRange" class="mt-3.5 pt-3.5 border-t border-zinc-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono text-emerald-400 rounded-lg border border-emerald-500/5 bg-emerald-500/5 p-2.5">
+      <div class="mt-3.5 pt-3.5 border-t border-zinc-800/60 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+          <span class="text-zinc-400 font-semibold">From:</span>
+          <input type="datetime-local" v-model="fromDateInput" class="bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-200 text-xs font-mono w-44 focus:outline-none focus:border-emerald-500/50" />
+          <span class="text-zinc-400 font-semibold">To:</span>
+          <input type="datetime-local" v-model="toDateInput" class="bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-200 text-xs font-mono w-44 focus:outline-none focus:border-emerald-500/50" />
+          <button @click="applyDateRange" class="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-xs font-semibold cursor-pointer transition-all">
+            <span>Apply</span>
+          </button>
+        </div>
+      </div>
+      <div v-if="telemetry.timeRange" class="mt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono text-emerald-400 rounded-lg border border-emerald-500/5 bg-emerald-500/5 p-2.5">
         <div class="flex items-center gap-2">
           <Clock class="h-4 w-4 text-emerald-400 animate-pulse shrink-0" />
           <span>
@@ -55,20 +66,30 @@
               <p class="text-xs text-zinc-400">Success and failed calls aggregate • <span class="text-emerald-400 font-semibold" title="Click on the chart to filter by that time slot">Click slot to select time period</span></p>
             </div>
             <div class="flex items-center gap-3 text-xs text-zinc-400">
+              <button @click="trafficZoomActive = !trafficZoomActive" class="px-2 py-1 rounded text-[10px] font-mono font-semibold border transition-all cursor-pointer" :class="trafficZoomActive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500'">
+                <span v-if="trafficZoomActive">Wheel Zoom: On</span>
+                <span v-else>Wheel Zoom: Off</span>
+              </button>
               <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-full" /> Success</span>
               <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-red-500 rounded-full" /> Errors</span>
             </div>
           </div>
-          <div class="h-72 w-full cursor-pointer">
+          <div class="h-72 w-full cursor-pointer rounded-xl transition-all" :class="trafficZoomActive ? 'ring-2 ring-emerald-500/40' : ''">
             <VChart v-if="trafficChartOptions" :option="trafficChartOptions" autoresize class="h-full w-full" @click="handleChartClick" @datazoom="handleDataZoom" />
           </div>
         </div>
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
-          <div>
-            <h3 class="text-white font-medium text-base">Average Latency Trend</h3>
-            <p class="text-xs text-zinc-400">System-wide responses • <span class="text-indigo-400 font-semibold" title="Click on the chart to filter by that time slot">Click bar to select time period</span></p>
+          <div class="flex justify-between items-center">
+            <div>
+              <h3 class="text-white font-medium text-base">Average Latency Trend</h3>
+              <p class="text-xs text-zinc-400">System-wide responses • <span class="text-indigo-400 font-semibold" title="Click on the chart to filter by that time slot">Click bar to select time period</span></p>
+            </div>
+            <button @click="latencyZoomActive = !latencyZoomActive" class="px-2 py-1 rounded text-[10px] font-mono font-semibold border transition-all cursor-pointer shrink-0" :class="latencyZoomActive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500'">
+              <span v-if="latencyZoomActive">Wheel Zoom: On</span>
+              <span v-else>Wheel Zoom: Off</span>
+            </button>
           </div>
-          <div class="h-72 w-full mt-4 cursor-pointer">
+          <div class="h-72 w-full mt-4 cursor-pointer rounded-xl transition-all" :class="latencyZoomActive ? 'ring-2 ring-emerald-500/40' : ''">
             <VChart v-if="latencyChartOptions" :option="latencyChartOptions" autoresize class="h-full w-full" @click="handleChartClick" @datazoom="handleDataZoom" />
           </div>
         </div>
@@ -212,13 +233,41 @@ const latestScan = computed(() => {
   return h[0] || { anomalyScore: 0 }
 })
 
+const trafficZoomActive = ref(false)
+const latencyZoomActive = ref(false)
+
+const fromDateInput = ref("")
+const toDateInput = ref("")
+
+function msToDatetimeLocal(ms) {
+  const d = new Date(ms)
+  const pad = (n) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function formatTime(ms) {
   return new Date(ms).toLocaleString().replace(",", " •")
 }
 
 function clearLens() {
+  fromDateInput.value = ""
+  toDateInput.value = ""
   telemetry.clearTimeRange()
 }
+
+function applyDateRange() {
+  const from = new Date(fromDateInput.value).getTime()
+  const to = new Date(toDateInput.value).getTime()
+  if (isNaN(from) || isNaN(to)) return
+  telemetry.setTimeRange(from, to)
+}
+
+watch(() => telemetry.timeRange, (range) => {
+  if (range) {
+    fromDateInput.value = msToDatetimeLocal(range.from)
+    toDateInput.value = msToDatetimeLocal(range.to)
+  }
+}, { immediate: true })
 
 function navigateToLogs(searchVal, pathFilter) {
   router.push({ name: "logs", query: { search: searchVal || pathFilter } })
@@ -336,10 +385,15 @@ const trafficChartOptions = computed(() => {
     tooltip: { trigger: "axis", backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: 8, textStyle: { fontSize: 11 } },
     legend: { show: false },
     grid: { top: 10, right: 10, left: 40, bottom: 30 },
-    dataZoom: [
-      { type: "inside", xAxisIndex: 0, throttle: 50 },
-      { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(16,185,129,0.18)", textStyle: { color: "#71717a" } },
-    ],
+    dataZoom: (() => {
+      const zooms = [
+        { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(16,185,129,0.18)", textStyle: { color: "#71717a" } },
+      ]
+      if (trafficZoomActive.value) {
+        zooms.unshift({ type: "inside", xAxisIndex: 0, throttle: 50 })
+      }
+      return zooms
+    })(),
     xAxis: { type: "category", data: telemetry.dashboardCharts.map(d => d.timeLabel), axisLabel: { color: "#71717a", fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: "value", splitLine: { lineStyle: { color: "#27272a", type: "dashed" } }, axisLabel: { color: "#71717a", fontSize: 10 } },
     series: [
@@ -354,10 +408,15 @@ const latencyChartOptions = computed(() => {
   return {
     tooltip: { trigger: "axis", backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: 8, textStyle: { fontSize: 11 } },
     grid: { top: 10, right: 10, left: 40, bottom: 30 },
-    dataZoom: [
-      { type: "inside", xAxisIndex: 0, throttle: 50 },
-      { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(99,102,241,0.2)", textStyle: { color: "#71717a" } },
-    ],
+    dataZoom: (() => {
+      const zooms = [
+        { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(99,102,241,0.2)", textStyle: { color: "#71717a" } },
+      ]
+      if (latencyZoomActive.value) {
+        zooms.unshift({ type: "inside", xAxisIndex: 0, throttle: 50 })
+      }
+      return zooms
+    })(),
     xAxis: { type: "category", data: telemetry.dashboardCharts.map(d => d.timeLabel), axisLabel: { color: "#71717a", fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: "value", splitLine: { lineStyle: { color: "#27272a", type: "dashed" } }, axisLabel: { color: "#71717a", fontSize: 10 }, axisLabel: { formatter: "{value} ms" } },
     series: [{ type: "bar", data: telemetry.dashboardCharts.map(d => d.avgLatency), itemStyle: { color: "#6366f1", borderRadius: [4, 4, 0, 0] } }],
