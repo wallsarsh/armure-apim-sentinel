@@ -20,6 +20,9 @@ export const useTelemetryStore = defineStore("telemetry", () => {
   const aiProvider = ref("")
   const aiModel = ref("")
   const aiApiBase = ref("")
+  const autoRefreshActive = ref(false)
+  const autoRefreshInterval = ref(5)
+  let autoRefreshTimer = null
 
   const activeAlertsCount = computed(() =>
     alerts.value.filter(a => !a.resolved).length
@@ -85,6 +88,36 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     } catch (e) {
       console.error("AI config fetch failed:", e)
       aiConfigured.value = false
+    }
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh()
+    autoRefreshActive.value = true
+    autoRefreshTimer = setInterval(() => pollAll(), autoRefreshInterval.value * 1000)
+  }
+
+  function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer)
+      autoRefreshTimer = null
+    }
+  }
+
+  function toggleAutoRefresh() {
+    if (autoRefreshActive.value) {
+      stopAutoRefresh()
+      autoRefreshActive.value = false
+    } else {
+      startAutoRefresh()
+    }
+  }
+
+  function setAutoRefreshInterval(seconds) {
+    autoRefreshInterval.value = seconds
+    if (autoRefreshActive.value) {
+      stopAutoRefresh()
+      startAutoRefresh()
     }
   }
 
@@ -176,9 +209,11 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     dashboardMetrics, dashboardCharts, dashboardBreakdown,
     isScanning, realtimeReady, totalLogs, initialLoading, activeAlertsCount,
     timeRange, aiConfigured, aiProvider, aiModel, aiApiBase,
+    autoRefreshActive, autoRefreshInterval,
     initialLoad, pollAll,
     fetchDashboard, fetchLogs, fetchSources, fetchRules,
     fetchAlerts, fetchScanHistory, triggerAnomalyScan, initRealtime,
     setTimeRange, clearTimeRange, fetchAIConfig,
+    startAutoRefresh, stopAutoRefresh, toggleAutoRefresh, setAutoRefreshInterval,
   }
 })

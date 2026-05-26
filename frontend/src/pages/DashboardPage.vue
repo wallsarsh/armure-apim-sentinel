@@ -12,7 +12,20 @@
             <p class="text-[10px] text-zinc-400">Click a chart data point, drag to zoom, or enter a custom time range</p>
           </div>
         </div>
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1">
+            <button @click="telemetry.toggleAutoRefresh" :class="['px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer border', telemetry.autoRefreshActive ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500']" :title="telemetry.autoRefreshActive ? 'Auto-refresh every ' + telemetry.autoRefreshInterval + 's' : 'Enable auto-refresh'">
+              <div v-if="telemetry.autoRefreshActive" class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <RefreshCw v-else class="h-3.5 w-3.5" />
+              <span>{{ telemetry.autoRefreshActive ? telemetry.autoRefreshInterval + 's' : 'Auto' }}</span>
+            </button>
+            <select v-if="telemetry.autoRefreshActive" :value="telemetry.autoRefreshInterval" @change="changeAutoRefreshInterval" class="bg-zinc-950 border border-zinc-700 rounded-lg px-1.5 py-1.5 text-zinc-200 text-[11px] font-mono focus:outline-none focus:border-emerald-500/50 w-14">
+              <option :value="5">5s</option>
+              <option :value="10">10s</option>
+              <option :value="30">30s</option>
+              <option :value="60">60s</option>
+            </select>
+          </div>
           <button v-if="telemetry.timeRange" @click="clearLens" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
             <X class="h-3.5 w-3.5" />
             <span>Clear Lens</span>
@@ -215,12 +228,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onUnmounted } from "vue"
+import { computed, ref, watch, onMounted, onUnmounted } from "vue"
 import { useRouter } from "vue-router"
 import { useTelemetryStore } from "../stores/telemetry"
 import VChart from "vue-echarts"
 import "echarts"
-import { Calendar, Clock, X, ArrowRight, Sparkles, Activity, ShieldCheck } from "lucide-vue-next"
+import { Calendar, Clock, X, ArrowRight, Sparkles, Activity, ShieldCheck, RefreshCw } from "lucide-vue-next"
 
 const router = useRouter()
 const telemetry = useTelemetryStore()
@@ -248,6 +261,10 @@ function msToDatetimeLocal(ms) {
 
 function formatTime(ms) {
   return new Date(ms).toLocaleString().replace(",", " •")
+}
+
+function changeAutoRefreshInterval(e) {
+  telemetry.setAutoRefreshInterval(Number(e.target.value))
 }
 
 function clearLens() {
@@ -356,8 +373,13 @@ function handleDataZoom(params) {
   }, 250)
 }
 
+onMounted(() => {
+  if (telemetry.autoRefreshActive) telemetry.startAutoRefresh()
+})
+
 onUnmounted(() => {
   if (dataZoomTimer) clearTimeout(dataZoomTimer)
+  telemetry.stopAutoRefresh()
 })
 
 const STATUS_COLORS = {

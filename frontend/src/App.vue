@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from "vue"
+import { ref, computed, watch, onMounted } from "vue"
 import { useRouter, useRoute } from "vue-router"
 import { useTelemetryStore } from "./stores/telemetry"
 import { useSessionStore } from "./stores/sessionStore"
@@ -81,8 +81,6 @@ const periodLabel = computed(() => {
 })
 
 const isGuestView = computed(() => route.meta?.guestOnly)
-
-let pollInterval = null
 
 const currentTab = computed(() => route.name || "dashboard")
 
@@ -127,11 +125,6 @@ onMounted(async () => {
     if (from && to && !isNaN(Number(from)) && !isNaN(Number(to))) {
       telemetry.setTimeRange(Number(from), Number(to))
     }
-    pollInterval = setInterval(() => telemetry.pollAll(periodHours.value), 2500)
   }
-})
-
-onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval)
 })
 </script>
