@@ -97,7 +97,20 @@ function toggleDark() {
 }
 
 watch(periodHours, (val) => {
+  telemetry.clearTimeRange()
   telemetry.fetchDashboard(val)
+})
+
+watch(() => telemetry.timeRange, (range) => {
+  const query = { ...route.query }
+  if (range) {
+    query.from = String(range.from)
+    query.to = String(range.to)
+  } else {
+    delete query.from
+    delete query.to
+  }
+  router.replace({ query })
 })
 
 onMounted(async () => {
@@ -109,6 +122,11 @@ onMounted(async () => {
 
   if (!isGuestView.value) {
     await telemetry.initialLoad()
+    const from = route.query.from
+    const to = route.query.to
+    if (from && to && !isNaN(Number(from)) && !isNaN(Number(to))) {
+      telemetry.setTimeRange(Number(from), Number(to))
+    }
     pollInterval = setInterval(() => telemetry.pollAll(periodHours.value), 2500)
   }
 })

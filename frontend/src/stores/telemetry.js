@@ -15,6 +15,7 @@ export const useTelemetryStore = defineStore("telemetry", () => {
   const realtimeReady = ref(false)
   const initialLoading = ref(true)
   const totalLogs = ref(0)
+  const timeRange = ref(null)
 
   const activeAlertsCount = computed(() =>
     alerts.value.filter(a => !a.resolved).length
@@ -41,10 +42,15 @@ export const useTelemetryStore = defineStore("telemetry", () => {
 
   async function fetchDashboard(period = 24) {
     try {
+      const params = { period }
+      if (timeRange.value) {
+        params.from_ = new Date(timeRange.value.from).toISOString()
+        params.to = new Date(timeRange.value.to).toISOString()
+      }
       const [summary, charts, breakdown] = await Promise.all([
-        api.call("armure_apim_sentinel.api.dashboard.get_summary", { period }),
-        api.call("armure_apim_sentinel.api.dashboard.get_charts", { period }),
-        api.call("armure_apim_sentinel.api.dashboard.get_breakdown", { period }),
+        api.call("armure_apim_sentinel.api.dashboard.get_summary", params),
+        api.call("armure_apim_sentinel.api.dashboard.get_charts", params),
+        api.call("armure_apim_sentinel.api.dashboard.get_breakdown", params),
       ])
       dashboardMetrics.value = summary
       dashboardCharts.value = charts?.timeline || []
@@ -52,6 +58,16 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     } catch (e) {
       console.error("Dashboard fetch failed:", e)
     }
+  }
+
+  async function setTimeRange(from, to) {
+    timeRange.value = { from, to }
+    await fetchDashboard()
+  }
+
+  async function clearTimeRange() {
+    timeRange.value = null
+    await fetchDashboard()
   }
 
   async function fetchLogs(params = {}) {
@@ -141,8 +157,10 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     logs, alerts, scanHistory, sources, rules,
     dashboardMetrics, dashboardCharts, dashboardBreakdown,
     isScanning, realtimeReady, totalLogs, initialLoading, activeAlertsCount,
+    timeRange,
     initialLoad, pollAll,
     fetchDashboard, fetchLogs, fetchSources, fetchRules,
     fetchAlerts, fetchScanHistory, triggerAnomalyScan, initRealtime,
+    setTimeRange, clearTimeRange,
   }
 })

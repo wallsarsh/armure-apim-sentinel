@@ -177,12 +177,28 @@ def search_logs(
 	return {"total": total, "logs": logs, "page": int(page), "page_size": int(page_size)}
 
 
-def aggregate_dashboard(period=24):
+def aggregate_dashboard(period=24, from_timestamp=None, to_timestamp=None):
 	client = get_client()
 	now = datetime.utcnow()
-	start_time = (now - timedelta(hours=int(period))).isoformat()
 
-	indices = ",".join([_daily_index(now - timedelta(days=i)) for i in range(max(1, int(period) // 24 + 1))])
+	if from_timestamp:
+		start_dt = datetime.fromisoformat(from_timestamp.replace("Z", "+00:00"))
+	else:
+		start_dt = now - timedelta(hours=int(period))
+
+	if to_timestamp:
+		end_dt = datetime.fromisoformat(to_timestamp.replace("Z", "+00:00"))
+	else:
+		end_dt = now
+
+	if start_dt > end_dt:
+		start_dt, end_dt = end_dt, start_dt
+
+	start_time = start_dt.isoformat()
+	end_time = end_dt.isoformat()
+
+	span_days = max(1, int((end_dt - start_dt).total_seconds() // 86400) + 1)
+	indices = ",".join([_daily_index(end_dt - timedelta(days=i)) for i in range(span_days)])
 
 	STATUS_DESCRIPTIONS = {
 		"200": "OK", "201": "Created", "204": "No Content", "301": "Moved",
@@ -195,7 +211,7 @@ def aggregate_dashboard(period=24):
 
 	query = {
 		"size": 0,
-		"query": {"range": {"timestamp": {"gte": start_time}}},
+		"query": {"range": {"timestamp": {"gte": start_time, "lte": end_time}}},
 		"aggs": {
 			"total_requests": {"value_count": {"field": "id"}},
 			"avg_latency": {"avg": {"field": "latency"}},
@@ -216,7 +232,7 @@ def aggregate_dashboard(period=24):
 					"field": "timestamp",
 					"fixed_interval": "1h",
 					"min_doc_count": 0,
-					"extended_bounds": {"min": start_time, "max": now.isoformat()},
+					"extended_bounds": {"min": start_time, "max": end_time},
 				},
 				"aggs": {
 					"avg_latency": {"avg": {"field": "latency"}},

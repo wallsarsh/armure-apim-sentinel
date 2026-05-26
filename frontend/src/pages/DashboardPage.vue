@@ -9,32 +9,24 @@
           </div>
           <div>
             <h4 class="text-white font-bold text-xs uppercase tracking-wider">Dashboard Historical Lens</h4>
-            <p class="text-[10px] text-zinc-400">Filter telemetry or click charts below to isolate specific time ranges</p>
+            <p class="text-[10px] text-zinc-400">Click a chart data point or drag to zoom to isolate specific time ranges</p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">From:</span>
-            <input type="datetime-local" v-model="localStartTime" class="bg-zinc-950 border border-zinc-800 hover:border-zinc-700 focus:border-emerald-500 rounded-lg p-2 text-zinc-200 focus:outline-none text-xs font-mono transition-colors" />
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">To:</span>
-            <input type="datetime-local" v-model="localEndTime" class="bg-zinc-950 border border-zinc-800 hover:border-zinc-700 focus:border-emerald-500 rounded-lg p-2 text-zinc-200 focus:outline-none text-xs font-mono transition-colors" />
-          </div>
-          <button v-if="localStartTime || localEndTime" @click="clearLens" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
+          <button v-if="telemetry.timeRange" @click="clearLens" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
             <X class="h-3.5 w-3.5" />
             <span>Clear Lens</span>
           </button>
         </div>
       </div>
-      <div v-if="localStartTime && localEndTime" class="mt-3.5 pt-3.5 border-t border-zinc-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono text-emerald-400 rounded-lg border border-emerald-500/5 bg-emerald-500/5 p-2.5">
+      <div v-if="telemetry.timeRange" class="mt-3.5 pt-3.5 border-t border-zinc-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] font-mono text-emerald-400 rounded-lg border border-emerald-500/5 bg-emerald-500/5 p-2.5">
         <div class="flex items-center gap-2">
           <Clock class="h-4 w-4 text-emerald-400 animate-pulse shrink-0" />
           <span>
             Isolated Interval:
-            <span class="font-bold underline text-white">{{ new Date(localStartTime).toLocaleString().replace(',', ' •') }}</span>
+            <span class="font-bold underline text-white">{{ formatTime(telemetry.timeRange.from) }}</span>
             to
-            <span class="font-bold underline text-white">{{ new Date(localEndTime).toLocaleString().replace(',', ' •') }}</span>
+            <span class="font-bold underline text-white">{{ formatTime(telemetry.timeRange.to) }}</span>
           </span>
         </div>
         <button @click="exploreLogs" class="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-md font-semibold flex items-center gap-1 hover:text-emerald-300 transition-colors cursor-pointer text-[10px]">
@@ -67,8 +59,8 @@
               <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 bg-red-500 rounded-full" /> Errors</span>
             </div>
           </div>
-          <div class="h-72 w-full cursor-pointer" @click="handleChartClick">
-            <VChart v-if="trafficChartOptions" :option="trafficChartOptions" autoresize class="h-full w-full" />
+          <div class="h-72 w-full cursor-pointer">
+            <VChart v-if="trafficChartOptions" :option="trafficChartOptions" autoresize class="h-full w-full" @click="handleChartClick" @datazoom="handleDataZoom" />
           </div>
         </div>
         <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 shadow-sm">
@@ -76,8 +68,8 @@
             <h3 class="text-white font-medium text-base">Average Latency Trend</h3>
             <p class="text-xs text-zinc-400">System-wide responses • <span class="text-indigo-400 font-semibold" title="Click on the chart to filter by that time slot">Click bar to select time period</span></p>
           </div>
-          <div class="h-72 w-full mt-4 cursor-pointer" @click="handleChartClick">
-            <VChart v-if="latencyChartOptions" :option="latencyChartOptions" autoresize class="h-full w-full" />
+          <div class="h-72 w-full mt-4 cursor-pointer">
+            <VChart v-if="latencyChartOptions" :option="latencyChartOptions" autoresize class="h-full w-full" @click="handleChartClick" @datazoom="handleDataZoom" />
           </div>
         </div>
       </div>
@@ -201,7 +193,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue"
+import { computed, ref, watch, onUnmounted } from "vue"
 import { useRouter } from "vue-router"
 import { useTelemetryStore } from "../stores/telemetry"
 import VChart from "vue-echarts"
@@ -211,8 +203,6 @@ import { Calendar, Clock, X, ArrowRight, Sparkles, Activity, ShieldCheck } from 
 const router = useRouter()
 const telemetry = useTelemetryStore()
 
-const localStartTime = ref("")
-const localEndTime = ref("")
 const hoveredEndpoint = ref(null)
 
 const bd = computed(() => telemetry.dashboardBreakdown)
@@ -222,9 +212,12 @@ const latestScan = computed(() => {
   return h[0] || { anomalyScore: 0 }
 })
 
+function formatTime(ms) {
+  return new Date(ms).toLocaleString().replace(",", " •")
+}
+
 function clearLens() {
-  localStartTime.value = ""
-  localEndTime.value = ""
+  telemetry.clearTimeRange()
 }
 
 function navigateToLogs(searchVal, pathFilter) {
@@ -232,24 +225,90 @@ function navigateToLogs(searchVal, pathFilter) {
 }
 
 function exploreLogs() {
-  const startMs = new Date(localStartTime.value).getTime()
-  const endMs = new Date(localEndTime.value).getTime()
-  router.push({ name: "logs", query: { startMs: String(startMs), endMs: String(endMs) } })
+  if (!telemetry.timeRange) return
+  router.push({
+    name: "logs",
+    query: {
+      startMs: String(telemetry.timeRange.from),
+      endMs: String(telemetry.timeRange.to),
+    },
+  })
 }
+
+let dataZoomTimer = null
 
 function handleChartClick(params) {
-  if (params?.data?.timestamp) {
-    const ts = new Date(params.data.timestamp)
-    localStartTime.value = toLocalDatetimeString(ts.getTime())
-    localEndTime.value = toLocalDatetimeString(ts.getTime() + 3600000)
+  if (!params) return
+  let idx = params.dataIndex
+  if (idx == null && params.name != null) {
+    idx = telemetry.dashboardCharts.findIndex(
+      d => d.timeLabel === String(params.name)
+    )
   }
+  if (idx == null || idx < 0) return
+  const point = telemetry.dashboardCharts[idx]
+  if (!point) return
+  const ts = new Date(point.timestamp || point.timeLabel).getTime()
+  if (isNaN(ts)) return
+  telemetry.setTimeRange(ts - 1800000, ts + 1800000)
 }
 
-function toLocalDatetimeString(ms) {
-  const d = new Date(ms)
-  const pad = (n) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+function resolveZoomIndex(value) {
+  if (value == null) return null
+  const labels = telemetry.dashboardCharts.map(d => d.timeLabel)
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const idx = Math.min(labels.length - 1, Math.max(0, Math.round(value)))
+    return idx >= 0 ? idx : null
+  }
+  const exact = labels.indexOf(String(value))
+  return exact >= 0 ? exact : null
 }
+
+function handleDataZoom(params) {
+  const batch = params?.batch || [params]
+  const zoom = batch[0]
+  if (!zoom) return
+
+  let startIdx = null
+  let endIdx = null
+
+  if (zoom.startValue != null && zoom.endValue != null) {
+    startIdx = resolveZoomIndex(zoom.startValue)
+    endIdx = resolveZoomIndex(zoom.endValue)
+  }
+
+  if (startIdx == null && zoom.start != null && zoom.end != null) {
+    const total = telemetry.dashboardCharts.length
+    if (total > 0) {
+      startIdx = Math.max(0, Math.round(total * zoom.start / 100))
+      endIdx = Math.min(total - 1, Math.round(total * zoom.end / 100))
+    }
+  }
+
+  if (startIdx == null || endIdx == null) return
+
+  const startTs = new Date(telemetry.dashboardCharts[startIdx].timestamp).getTime()
+  const endTs = new Date(telemetry.dashboardCharts[endIdx].timestamp).getTime()
+  if (isNaN(startTs) || isNaN(endTs)) return
+
+  const from = Math.min(startTs, endTs)
+  const to = Math.max(startTs, endTs)
+
+  if (telemetry.timeRange &&
+      Math.abs(telemetry.timeRange.from - from) < 1000 &&
+      Math.abs(telemetry.timeRange.to - (to + 3600000)) < 1000) {
+    return
+  }
+
+  if (dataZoomTimer) clearTimeout(dataZoomTimer)
+  dataZoomTimer = setTimeout(() => {
+    telemetry.setTimeRange(from, to + 3600000)
+  }, 250)
+}
+
+onUnmounted(() => {
+  if (dataZoomTimer) clearTimeout(dataZoomTimer)
+})
 
 const STATUS_COLORS = {
   "200": "#10b981", "201": "#059669", "304": "#3b82f6", "400": "#f59e0b",
@@ -276,12 +335,16 @@ const trafficChartOptions = computed(() => {
   return {
     tooltip: { trigger: "axis", backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: 8, textStyle: { fontSize: 11 } },
     legend: { show: false },
-    grid: { top: 10, right: 10, left: 40, bottom: 20 },
+    grid: { top: 10, right: 10, left: 40, bottom: 30 },
+    dataZoom: [
+      { type: "inside", xAxisIndex: 0, throttle: 50 },
+      { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(16,185,129,0.18)", textStyle: { color: "#71717a" } },
+    ],
     xAxis: { type: "category", data: telemetry.dashboardCharts.map(d => d.timeLabel), axisLabel: { color: "#71717a", fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: "value", splitLine: { lineStyle: { color: "#27272a", type: "dashed" } }, axisLabel: { color: "#71717a", fontSize: 10 } },
     series: [
-      { name: "Success", type: "line", data: telemetry.dashboardCharts.map(d => d.success), smooth: true, lineStyle: { color: "#10b981", width: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(16,185,129,0.25)" }, { offset: 1, color: "rgba(16,185,129,0)" }] } }, itemStyle: { color: "#10b981" } },
-      { name: "Errors", type: "line", data: telemetry.dashboardCharts.map(d => d.errors), smooth: true, lineStyle: { color: "#ef4444", width: 1.5 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(239,68,68,0.25)" }, { offset: 1, color: "rgba(239,68,68,0)" }] } }, itemStyle: { color: "#ef4444" } },
+      { name: "Success", type: "line", data: telemetry.dashboardCharts.map(d => d.success), smooth: true, triggerLineEvent: true, lineStyle: { color: "#10b981", width: 2 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(16,185,129,0.25)" }, { offset: 1, color: "rgba(16,185,129,0)" }] } }, itemStyle: { color: "#10b981" } },
+      { name: "Errors", type: "line", data: telemetry.dashboardCharts.map(d => d.errors), smooth: true, triggerLineEvent: true, lineStyle: { color: "#ef4444", width: 1.5 }, areaStyle: { color: { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: "rgba(239,68,68,0.25)" }, { offset: 1, color: "rgba(239,68,68,0)" }] } }, itemStyle: { color: "#ef4444" } },
     ],
   }
 })
@@ -290,7 +353,11 @@ const latencyChartOptions = computed(() => {
   if (!telemetry.dashboardCharts?.length) return null
   return {
     tooltip: { trigger: "axis", backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: 8, textStyle: { fontSize: 11 } },
-    grid: { top: 10, right: 10, left: 40, bottom: 20 },
+    grid: { top: 10, right: 10, left: 40, bottom: 30 },
+    dataZoom: [
+      { type: "inside", xAxisIndex: 0, throttle: 50 },
+      { type: "slider", xAxisIndex: 0, bottom: 0, height: 18, borderColor: "#27272a", fillerColor: "rgba(99,102,241,0.2)", textStyle: { color: "#71717a" } },
+    ],
     xAxis: { type: "category", data: telemetry.dashboardCharts.map(d => d.timeLabel), axisLabel: { color: "#71717a", fontSize: 10 }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: { type: "value", splitLine: { lineStyle: { color: "#27272a", type: "dashed" } }, axisLabel: { color: "#71717a", fontSize: 10 }, axisLabel: { formatter: "{value} ms" } },
     series: [{ type: "bar", data: telemetry.dashboardCharts.map(d => d.avgLatency), itemStyle: { color: "#6366f1", borderRadius: [4, 4, 0, 0] } }],

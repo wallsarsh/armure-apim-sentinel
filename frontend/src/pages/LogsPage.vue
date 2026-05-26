@@ -402,8 +402,24 @@ function refetchLogs() {
 
 watch([searchQuery, selectedSource, selectedStatus, selectedMethod, minLatency, maxLatency, startTime, endTime], refetchLogs)
 
+function toLocalDatetimeString(ms) {
+  const d = new Date(ms)
+  const pad = (n) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 onMounted(() => {
   telemetry.fetchSources()
+  const startMs = route.query.startMs
+  const endMs = route.query.endMs
+  if (startMs && endMs) {
+    const from = Number(startMs)
+    const to = Number(endMs)
+    if (!isNaN(from) && !isNaN(to)) {
+      startTime.value = toLocalDatetimeString(from)
+      endTime.value = toLocalDatetimeString(to)
+    }
+  }
   refetchLogs()
 })
 </script>

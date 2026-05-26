@@ -409,7 +409,7 @@ The `get_permission_query_conditions` function is registered in `hooks.py` for e
 | `POST /api/alerts/resolve` | `api.alerts.resolve_all()` | System Manager | |
 | `POST /api/alerts/:id/resolve` | `api.alerts.resolve_one()` | System Manager | |
 | `POST /api/simulation/config` | `api.simulation.update_config()` | System Manager | Updates App Settings Singleton |
-| `POST /api/explain-error` | `api.ai.explain_error(log_id)` | System Manager | Reads log from OpenSearch by id; uses configured AI provider |
+| `POST /api/explain-error` | `api.ai.explain_error(logId)` | System Manager | Reads log from OpenSearch by id; uses configured AI provider |
 | `POST /api/anomaly-scan` | `api.anomaly.trigger_anomaly_scan()` | System Manager | Fetches last 85 from OpenSearch; enqueues `ai.run_ai_audit()`; uses configured AI provider |
 | `GET /api/anomaly-scan/history` | Frappe standard API on AI Audit Assessment | System Manager | |
 
@@ -1884,7 +1884,7 @@ def explain_error(logId):
     # Fetch single log from OpenSearch by ID
     try:
         response = client.search(index="api-telemetry-logs-*", body={
-            "query": {"term": {"_id": logId}},
+            "query": {"term": {"id": logId}},
             "size": 1,
         })
         hits = response.get("hits", {}).get("hits", [])
@@ -1974,3 +1974,200 @@ The `google-generativeai` package stays as an inline import (it's not a hard dep
 - [ ] App Settings UI shows the 4 new AI config fields
 - [ ] `openai` package listed in `pyproject.toml` dependencies
 - [ ] Frontend unchanged — all AI calls go through the same Frappe whitelisted methods
+
+---
+
+## 14. Chart Zoom → Time Range Filter
+
+### 14.1 Motivation
+
+Currently, the dashboard time window is controlled by a fixed-period dropdown (2h/24h/3d) in the App header. Users cannot drill into a specific time range by interacting with charts. Clicking a chart data point sets local datetime-local inputs for "Explore Logs" navigation but does **not** re-fetch the dashboard data to that window.
+
+The Gravitee APIM console (analyzed at `frappe-reference/apim/gravitee-apim-console-webui/src/`) uses a central `BehaviorSubject<TimeRangeParams>` pattern where chart zoom/click events propagate `from`/`to` timestamps to all dashboard widgets, which re-fetch via `switchMap`. This pattern enables:
+
+- Click on a chart data point → set time window to that bucket's range
+- Drag-to-zoom on a chart → set time window to the selection boundaries
+- All dashboard charts re-render for the selected window
+- "Explore Logs" navigates to logs page pre-filtered to the same window
+- URL query params (`?from=...&to=...`) persist the state for bookmarkable URLs
+
+### 14.2 Data Flow
+
+```
+User clicks/drags on chart
+    ↓
+ECharts event: @chart-click or @datazoom
+    ↓
+Handler extracts { from: timestampMs, to: timestampMs }
+    ↓
+telemetry.setTimeRange(from, to)
+    ↓
+├── telemetry.timeRange updated (reactive)
+├── telemetry.fetchDashboard() called with from_/to query params
+├── App.vue watcher syncs from/to to URL query params
+↓
+Backend aggregate_dashboard() receives from_timestamp/to_timestamp
+    ↓
+OpenSearch range query filtered to [from, to]
+    ↓
+All charts re-render with filtered data
+```
+
+### 14.3 Backend Changes
+
+#### 14.3.1 `opensearch_client.py` — `aggregate_dashboard()`
+
+Add optional `from_timestamp` / `to_timestamp` params. When present, they override the period-based start/end calculation:
+
+```python
+def aggregate_dashboard(period=24, from_timestamp=None, to_timestamp=None):
+    now = datetime.utcnow()
+    if from_timestamp:
+        start_time = datetime.fromisoformat(from_timestamp.replace("Z", "+00:00"))
+    else:
+        start_time = now - timedelta(hours=int(period))
+    if to_timestamp:
+        end_time = datetime.fromisoformat(to_timestamp.replace("Z", "+00:00"))
+    else:
+        end_time = now
+```
+
+The OpenSearch `range` query adds both `gte` (start_time) and `lte` (end_time).
+
+#### 14.3.2 `api/dashboard.py` — `get_summary()`, `get_charts()`, `get_breakdown()`
+
+Add optional `from_` / `to` GET params (trailing underscore to avoid Python keyword conflict; Frappe receives `from` from the URL):
+
+```python
+def get_summary(period=24, from_=None, to=None):
+    return aggregate_dashboard(period=period, from_timestamp=from_, to_timestamp=to).get("summary", {})
+```
+
+### 14.4 Frontend State Changes
+
+#### 14.4.1 `stores/telemetry.js` — Time range state
+
+Add to store:
+
+```js
+timeRange: ref(null)   // null | { from: number, to: number } — millisecond timestamps
+```
+
+Actions:
+
+```js
+setTimeRange(from, to)        // Set range, call fetchDashboard()
+clearTimeRange()              // Reset to null, call fetchDashboard() with default period
+```
+
+Modify `fetchDashboard(period=24)`:
+- If `timeRange.value` is set, pass `from_` and `to` as query params
+- Otherwise, pass `period` as before
+
+#### 14.4.2 `pages/DashboardPage.vue` — Chart interaction
+
+| Current | Replacement |
+|---|---|
+| Local `localStartTime`/`localEndTime` refs | Use `telemetry.timeRange` |
+| `handleChartClick(params)` on `<div>` wrapper | `@chart-click` on `<VChart>` + `@datazoom` for drag-zoom |
+| Sets local datetime inputs | Calls `telemetry.setTimeRange(from, to)` |
+| `clearLens()` resets local state | Calls `telemetry.clearTimeRange()` |
+| `exploreLogs()` uses local state | Reads from `telemetry.timeRange` |
+
+echarts event wiring:
+
+```html
+<VChart
+  :option="trafficChartOptions"
+  @chart-click="handleChartClick"
+  @datazoom="handleDataZoom"
+  autoresize
+  class="h-full w-full"
+/>
+```
+
+```js
+function handleChartClick(params) {
+  if (params?.data?.timestamp) {
+    const ts = new Date(params.data.timestamp).getTime()
+    // 1-hour window centered on clicked point
+    telemetry.setTimeRange(ts - 1800000, ts + 1800000)
+  }
+}
+
+function handleDataZoom(params) {
+  if (params.startValue && params.endValue) {
+    telemetry.setTimeRange(params.startValue, params.endValue)
+  }
+}
+```
+
+#### 14.4.3 `App.vue` — URL sync + period integration
+
+Add a watcher on `telemetry.timeRange` to sync to URL:
+
+```js
+watch(() => telemetry.timeRange, (range) => {
+  const query = { ...route.query }
+  if (range) {
+    query.from = String(range.from)
+    query.to = String(range.to)
+  } else {
+    delete query.from
+    delete query.to
+  }
+  router.replace({ query })
+})
+```
+
+On mount, read `route.query.from`/`route.query.to` and restore time range if present.
+
+When user changes the period dropdown, also call `clearTimeRange()`:
+
+```js
+watch(periodHours, (val) => {
+  telemetry.clearTimeRange()
+  telemetry.fetchDashboard(val)
+})
+```
+
+#### 14.4.4 `pages/LogsPage.vue` — Consume route query params
+
+Currently ignores `startMs`/`endMs`. Add on mount:
+
+```js
+// Parse route query params from dashboard "Explore Logs" navigation
+if (route.query.startMs) startTime.value = route.query.startMs
+if (route.query.endMs) endTime.value = route.query.endMs
+if (route.query.startMs || route.query.endMs) refetchLogs()
+```
+
+### 14.5 Files Changed
+
+| File | Action | Change |
+|---|---|---|
+| `armure_apim_sentinel/opensearch_client.py` | **Modify** | Add `from_timestamp`/`to_timestamp` to `aggregate_dashboard()` |
+| `armure_apim_sentinel/api/dashboard.py` | **Modify** | Add optional `from_`/`to` params to all 3 endpoints |
+| `frontend/src/stores/telemetry.js` | **Modify** | Add `timeRange` state, `setTimeRange()`, `clearTimeRange()`, update `fetchDashboard()` |
+| `frontend/src/pages/DashboardPage.vue` | **Modify** | Replace local datetime state with store, add echarts events, update handlers |
+| `frontend/src/App.vue` | **Modify** | Add URL sync watcher, clear timeRange on period change, init from URL |
+| `frontend/src/pages/LogsPage.vue` | **Modify** | Read `startMs`/`endMs` from route query on mount |
+
+### 14.6 Not Changed
+
+- No new npm packages or Python dependencies
+- No new files created
+- No DocType schema changes
+- No changes to the polling mechanism or other pages (AlertsPage, SourcesPage, NotificationsPage)
+
+### 14.7 Design Decisions
+
+1. **Chart click behavior**: A single click on a data point creates a 1-hour window centered on the clicked bucket. This allows users to quickly zoom in on a specific time period without drag-selecting.
+
+2. **Drag-to-zoom**: echarts `datazoom` event fires when the user selects a range via the built-in brush/zoom interaction. The exact start/end values from the zoom are used (no centering).
+
+3. **Period dropdown coexistence**: When a custom time range is active, the period dropdown continues to show its selected value but is visually overridden. The next time the user clicks a period preset, the custom range is cleared.
+
+4. **Interval/bucket size**: Kept at the backend's fixed `1h` for now. Dynamic interval calculation (Gravitee's approach) can be added later as an enhancement.
+
+5. **Pie chart**: No time zoom — clicking a pie slice could filter the endpoint breakdown table (separate from time range).
