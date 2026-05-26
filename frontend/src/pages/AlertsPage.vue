@@ -432,21 +432,21 @@
             <h3 class="text-purple-300 font-semibold text-lg flex items-center gap-2">
               <Brain class="h-5.5 w-5.5 text-purple-400 animate-pulse" />
               <span>AI Anomaly Detection engine</span>
-              <span class="bg-purple-500/20 text-purple-300 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">GEMINI PRO</span>
+              <span class="bg-purple-500/20 text-purple-300 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono">ARMURE VANI AI</span>
             </h3>
-            <p class="text-xs text-zinc-500 max-w-xl">Deploy Gemini as a virtual Security SRE. It will audit recent system traffic metrics, look for brute force attacks, identify performance drift, and compile a report.</p>
+            <p class="text-xs text-zinc-500 max-w-xl">Deploy Armure Vani AI as a virtual Security SRE. It will audit recent system traffic metrics, look for brute force attacks, identify performance drift, and compile a report.</p>
           </div>
           <button @click="runScan" :disabled="telemetry.isScanning" :class="['px-4 py-2.5 rounded-xl text-xs font-semibold select-none shadow hover:shadow-purple-500/10 cursor-pointer flex items-center gap-2 transition-all font-mono shrink-0 z-10', telemetry.isScanning ? 'bg-purple-950/40 text-purple-300 border border-purple-500/20 cursor-wait' : 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-500']">
             <div v-if="telemetry.isScanning" class="h-4.5 w-4.5 border-2 border-t-purple-300 border-purple-900 rounded-full animate-spin" />
             <Sparkles v-else class="h-4 w-4" />
-            <span>{{ telemetry.isScanning ? 'Scanning Logs...' : 'Execute Gemini Security Scan' }}</span>
+            <span>{{ telemetry.isScanning ? 'Scanning Logs...' : 'Execute Armure Vani Security Scan' }}</span>
           </button>
         </div>
 
         <div v-if="telemetry.isScanning" class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-4 animate-pulse">
           <Brain class="h-12 w-12 text-emerald-500 animate-bounce" />
           <div class="space-y-1">
-            <p class="text-white text-sm font-semibold">Gemini Security Agent is analyzing API Telemetry</p>
+            <p class="text-white text-sm font-semibold">Armure Vani AI is analyzing API Telemetry</p>
             <p class="text-zinc-500 text-xs">Analyzing response code aggregates, tracking high frequency client IPs, and auditing performance regressions...</p>
           </div>
         </div>
@@ -482,7 +482,7 @@
               <div class="flex justify-between items-center mb-3">
                 <h4 class="text-white font-medium text-sm inline-flex items-center gap-1.5">
                   <Sparkles class="h-4 w-4 text-emerald-500" />
-                  <span>Gemini Generated Report Summary</span>
+                  <span>Armure Vani AI Generated Report Summary</span>
                 </h4>
                 <span class="text-[10px] text-zinc-500">Recent scan outputs</span>
               </div>
@@ -754,7 +754,7 @@ async function createRule() {
 
 async function fetchChannels() {
   try {
-    const res = await api.get("armure_apim_sentinel.api.notifications.list_channels")
+    const res = await api.call("armure_apim_sentinel.api.notifications.list_channels")
     availableChannels.value = res.message || []
   } catch (e) { console.error(e) }
 }

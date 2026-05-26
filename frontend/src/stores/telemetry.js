@@ -92,7 +92,14 @@ export const useTelemetryStore = defineStore("telemetry", () => {
 
   async function fetchScanHistory(limit = 10) {
     try {
-      scanHistory.value = await api.call("armure_apim_sentinel.api.anomaly.list_anomaly_reports", { limit })
+      const raw = await api.call("armure_apim_sentinel.api.anomaly.list_anomaly_reports", { limit })
+      scanHistory.value = (raw || []).map(r => ({
+        name: r.name,
+        timestamp: r.scan_time,
+        anomalyScore: r.anomaly_score,
+        detectedAlertsCount: r.triggered_alerts_count,
+        analysis: r.generated_summary,
+      }))
     } catch (e) {
       console.error("Scan history fetch failed:", e)
     }
@@ -118,7 +125,13 @@ export const useTelemetryStore = defineStore("telemetry", () => {
         }
       })
       window.frappe.realtime.on("security_scan_complete", (data) => {
-        scanHistory.value.unshift(data)
+        scanHistory.value.unshift({
+          name: data.name,
+          timestamp: data.scan_time || new Date().toISOString(),
+          anomalyScore: data.score || 0,
+          detectedAlertsCount: data.alerts_count || 0,
+          analysis: data.summary || "",
+        })
       })
       realtimeReady.value = true
     }

@@ -2,7 +2,9 @@
   <div class="flex min-h-screen bg-zinc-950 items-center justify-center p-6">
     <div class="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-8 space-y-6 shadow-2xl">
       <div class="text-center space-y-1">
-        <h1 class="text-white text-xl font-bold">API Security Monitor</h1>
+        <img src="/assets/logo-400x400.png" class="w-[200px] h-[200px] m-auto" />
+        <h1 class="text-white text-xl font-bold">Armure APIM Sentinel</h1>
+        <h4>Gateway Governance Control</h4>
         <p class="text-zinc-500 text-xs">Sign in to your account</p>
       </div>
       <form class="space-y-4" @submit.prevent="makeLoginRequest">

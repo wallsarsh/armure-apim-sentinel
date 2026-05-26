@@ -2,11 +2,11 @@
   <aside class="w-full md:w-64 bg-zinc-900/50 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col justify-between shrink-0 p-5 md:h-screen md:sticky md:top-0 select-none">
     <div class="space-y-6">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-zinc-950 font-bold shadow-lg shadow-emerald-500/10 shrink-0">
-          <Cpu class="h-4.5 w-4.5" />
+        <div class="w-8 h-8 rounded flex items-center justify-center text-zinc-950 font-bold shadow-lg shadow-emerald-500/10 shrink-0">
+          <img src="/assets/logo-80x80.png" class="h-4.5 w-4.5" />
         </div>
         <div>
-          <h1 class="text-zinc-100 font-bold text-sm tracking-tight leading-none uppercase">Gateway Sentinel</h1>
+          <h1 class="text-zinc-100 font-bold text-sm tracking-tight leading-none uppercase">Armure APIM Sentinel</h1>
           <span class="text-zinc-500 text-[10px] uppercase font-bold tracking-widest mt-1 block">API MONITOR v2.4</span>
         </div>
       </div>

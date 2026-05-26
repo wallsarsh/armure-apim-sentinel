@@ -197,17 +197,17 @@
                 <div class="flex justify-between items-center">
                   <h5 class="text-white font-semibold text-sm flex items-center gap-1.5">
                     <Sparkles class="h-4.5 w-4.5 text-emerald-500" />
-                    <span>Gemini AI Trace Explainer</span>
+                    <span>Armure Vani AI Trace Explainer</span>
                   </h5>
                   <button @click="explainWithAI(selectedLog.id)" :disabled="isExplaining" :class="['px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1.5 border select-none transition-all', isExplaining ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-wait' : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-zinc-950 border-emerald-500/20 hover:border-emerald-500']">
                     <Cpu v-if="!isExplaining" class="h-3.5 w-3.5" />
                     <div v-if="isExplaining" class="h-3 w-3 border-2 border-t-zinc-400 border-zinc-700 rounded-full animate-spin" />
-                    <span>{{ isExplaining ? 'Asking Gemini...' : 'Explain Trace Cause' }}</span>
+                    <span>{{ isExplaining ? 'Asking Vani AI...' : 'Explain Trace Cause' }}</span>
                   </button>
                 </div>
                 <div v-if="isExplaining" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center flex flex-col items-center justify-center space-y-3 animate-pulse">
                   <Cpu class="h-8 w-8 text-emerald-500 animate-spin" />
-                  <p class="text-zinc-300 text-xs">Gemini model is dissecting HTTP headers and troubleshooting vectors...</p>
+                  <p class="text-zinc-300 text-xs">Vani AI model is dissecting HTTP headers and troubleshooting vectors...</p>
                 </div>
                 <div v-if="explainError" class="p-3 bg-rose-500/5 border border-rose-500/10 rounded-xl text-rose-400 text-xs font-mono">⚠ API Explainer failure: {{ explainError }}</div>
                 <div v-if="aiExplanation" class="bg-emerald-950/10 border border-emerald-500/15 p-4 rounded-xl text-xs text-zinc-300 font-sans leading-relaxed space-y-3 custom-scrollbar">
@@ -360,7 +360,7 @@ async function explainWithAI(logId) {
     const result = await api.post("armure_apim_sentinel.api.ai.explain_error", { logId })
     aiExplanation.value = result.explanation
   } catch (e) {
-    explainError.value = e.message || "Failed calling Gemini AI model."
+    explainError.value = e.message || "Failed calling Armure Vani AI."
   } finally {
     isExplaining.value = false
   }

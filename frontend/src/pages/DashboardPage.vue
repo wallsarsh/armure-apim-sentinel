@@ -159,7 +159,7 @@
               <Sparkles class="h-4.5 w-4.5 text-purple-400" />
               <span>AI Anomaly Score Trend</span>
             </h3>
-            <p class="text-xs text-zinc-400">Past Gemini-generated audits • <span class="text-purple-400 font-semibold">Click point to view logs</span></p>
+            <p class="text-xs text-zinc-400">Past AI audits • <span class="text-purple-400 font-semibold">Click point to view logs</span></p>
           </div>
           <div v-if="telemetry.scanHistory.length" class="flex items-center gap-3.5 text-xs text-zinc-400 select-none">
             <span class="flex items-center gap-1.5">
@@ -179,7 +179,7 @@
           <div class="flex flex-col items-center justify-center py-12 px-6 bg-zinc-950/40 border border-dashed border-zinc-800 rounded-xl text-center">
             <Activity class="h-8 w-8 text-zinc-500 mb-2.5 animate-pulse" />
             <span class="text-white text-xs font-semibold block">No Scan History Records Available</span>
-            <p class="text-zinc-400 text-[11px] max-w-sm mt-1 mx-auto leading-relaxed">Activate Gemini anomaly analysis in the "Alerts & Policy" panel. Your prior scanning score runs will automatically map here.</p>
+            <p class="text-zinc-400 text-[11px] max-w-sm mt-1 mx-auto leading-relaxed">Activate AI anomaly analysis in the "Alerts & Policy" panel. Your prior scanning score runs will automatically map here.</p>
           </div>
         </template>
       </div>
