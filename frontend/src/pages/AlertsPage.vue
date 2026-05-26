@@ -436,11 +436,15 @@
             </h3>
             <p class="text-xs text-zinc-500 max-w-xl">Deploy Armure Vani AI as a virtual Security SRE. It will audit recent system traffic metrics, look for brute force attacks, identify performance drift, and compile a report.</p>
           </div>
-          <button @click="runScan" :disabled="telemetry.isScanning" :class="['px-4 py-2.5 rounded-xl text-xs font-semibold select-none shadow hover:shadow-purple-500/10 cursor-pointer flex items-center gap-2 transition-all font-mono shrink-0 z-10', telemetry.isScanning ? 'bg-purple-950/40 text-purple-300 border border-purple-500/20 cursor-wait' : 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-500']">
+          <button @click="runScan" :disabled="!telemetry.aiConfigured || telemetry.isScanning" :class="['px-4 py-2.5 rounded-xl text-xs font-semibold select-none shadow hover:shadow-purple-500/10 flex items-center gap-2 transition-all font-mono shrink-0 z-10', !telemetry.aiConfigured ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed opacity-60' : telemetry.isScanning ? 'bg-purple-950/40 text-purple-300 border border-purple-500/20 cursor-wait' : 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-500 cursor-pointer']" :title="!telemetry.aiConfigured ? 'Configure AI provider in Settings to enable anomaly scanning' : ''">
             <div v-if="telemetry.isScanning" class="h-4.5 w-4.5 border-2 border-t-purple-300 border-purple-900 rounded-full animate-spin" />
             <Sparkles v-else class="h-4 w-4" />
             <span>{{ telemetry.isScanning ? 'Scanning Logs...' : 'Execute Armure Vani Security Scan' }}</span>
           </button>
+        </div>
+
+        <div v-if="!telemetry.aiConfigured" class="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl text-amber-400 text-xs font-mono">
+          ⚙ AI provider not configured. Set API URL, key, and model in App Settings to enable anomaly detection.
         </div>
 
         <div v-if="telemetry.isScanning" class="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-4 animate-pulse">

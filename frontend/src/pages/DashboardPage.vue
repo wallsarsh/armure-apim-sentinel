@@ -192,7 +192,8 @@
           <div class="flex flex-col items-center justify-center py-12 px-6 bg-zinc-950/40 border border-dashed border-zinc-800 rounded-xl text-center">
             <Activity class="h-8 w-8 text-zinc-500 mb-2.5 animate-pulse" />
             <span class="text-white text-xs font-semibold block">No Scan History Records Available</span>
-            <p class="text-zinc-400 text-[11px] max-w-sm mt-1 mx-auto leading-relaxed">Activate AI anomaly analysis in the "Alerts & Policy" panel. Your prior scanning score runs will automatically map here.</p>
+            <p v-if="!telemetry.aiConfigured" class="text-amber-400 text-[11px] max-w-sm mt-1 mx-auto leading-relaxed">⚠ AI provider not configured. Set API URL, key, and model in App Settings to enable anomaly scanning.</p>
+            <p v-else class="text-zinc-400 text-[11px] max-w-sm mt-1 mx-auto leading-relaxed">Activate AI anomaly analysis in the "Alerts & Policy" panel. Your prior scanning score runs will automatically map here.</p>
           </div>
         </template>
       </div>

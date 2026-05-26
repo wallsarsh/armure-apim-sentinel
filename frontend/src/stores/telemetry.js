@@ -16,6 +16,10 @@ export const useTelemetryStore = defineStore("telemetry", () => {
   const initialLoading = ref(true)
   const totalLogs = ref(0)
   const timeRange = ref(null)
+  const aiConfigured = ref(false)
+  const aiProvider = ref("")
+  const aiModel = ref("")
+  const aiApiBase = ref("")
 
   const activeAlertsCount = computed(() =>
     alerts.value.filter(a => !a.resolved).length
@@ -36,6 +40,7 @@ export const useTelemetryStore = defineStore("telemetry", () => {
       fetchRules(),
       fetchAlerts(),
       fetchScanHistory(),
+      fetchAIConfig(),
     ])
     initialLoading.value = false
   }
@@ -68,6 +73,19 @@ export const useTelemetryStore = defineStore("telemetry", () => {
   async function clearTimeRange() {
     timeRange.value = null
     await fetchDashboard()
+  }
+
+  async function fetchAIConfig() {
+    try {
+      const data = await api.call("armure_apim_sentinel.api.config.get_settings_data")
+      aiConfigured.value = data.ai_configured
+      aiProvider.value = data.ai_provider
+      aiModel.value = data.ai_model
+      aiApiBase.value = data.ai_api_base
+    } catch (e) {
+      console.error("AI config fetch failed:", e)
+      aiConfigured.value = false
+    }
   }
 
   async function fetchLogs(params = {}) {
@@ -157,10 +175,10 @@ export const useTelemetryStore = defineStore("telemetry", () => {
     logs, alerts, scanHistory, sources, rules,
     dashboardMetrics, dashboardCharts, dashboardBreakdown,
     isScanning, realtimeReady, totalLogs, initialLoading, activeAlertsCount,
-    timeRange,
+    timeRange, aiConfigured, aiProvider, aiModel, aiApiBase,
     initialLoad, pollAll,
     fetchDashboard, fetchLogs, fetchSources, fetchRules,
     fetchAlerts, fetchScanHistory, triggerAnomalyScan, initRealtime,
-    setTimeRange, clearTimeRange,
+    setTimeRange, clearTimeRange, fetchAIConfig,
   }
 })

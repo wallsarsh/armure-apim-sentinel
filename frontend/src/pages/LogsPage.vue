@@ -199,11 +199,14 @@
                     <Sparkles class="h-4.5 w-4.5 text-emerald-500" />
                     <span>Armure Vani AI Trace Explainer</span>
                   </h5>
-                  <button @click="explainWithAI(selectedLog.id)" :disabled="isExplaining" :class="['px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1.5 border select-none transition-all', isExplaining ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-wait' : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-zinc-950 border-emerald-500/20 hover:border-emerald-500']">
+                  <button @click="explainWithAI(selectedLog.id)" :disabled="!telemetry.aiConfigured || isExplaining" :class="['px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 border select-none transition-all', !telemetry.aiConfigured ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-not-allowed opacity-60' : isExplaining ? 'bg-zinc-800 text-zinc-500 border-zinc-700 cursor-wait' : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-zinc-950 border-emerald-500/20 hover:border-emerald-500 cursor-pointer']" :title="!telemetry.aiConfigured ? 'Configure AI provider in Settings to enable Armure Vani AI' : ''">
                     <Cpu v-if="!isExplaining" class="h-3.5 w-3.5" />
                     <div v-if="isExplaining" class="h-3 w-3 border-2 border-t-zinc-400 border-zinc-700 rounded-full animate-spin" />
                     <span>{{ isExplaining ? 'Asking Vani AI...' : 'Explain Trace Cause' }}</span>
                   </button>
+                </div>
+                <div v-if="!telemetry.aiConfigured" class="p-3 bg-amber-500/5 border border-amber-500/10 rounded-xl text-amber-400 text-xs font-mono">
+                  ⚙ Vani AI provider not configured. Set API URL, key, and model in App Settings to enable AI trace explanations.
                 </div>
                 <div v-if="isExplaining" class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 text-center flex flex-col items-center justify-center space-y-3 animate-pulse">
                   <Cpu class="h-8 w-8 text-emerald-500 animate-spin" />
